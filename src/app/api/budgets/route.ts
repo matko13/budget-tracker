@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createUntypedClient } from "@/lib/supabase/server-untyped";
+import { ensureBudgetsForMonth } from "@/lib/budget-utils";
 
 // Helper to get first day of month in YYYY-MM-DD format
 function getMonthStart(date: Date): string {
@@ -42,6 +43,9 @@ export async function GET(request: Request) {
     const budgetMonth = getMonthStart(targetDate);
     const startOfMonth = getMonthStart(targetDate);
     const endOfMonth = getMonthEnd(targetDate);
+
+    // Auto-copy budgets from previous month if none exist for this month
+    await ensureBudgetsForMonth(supabase, user.id, targetDate.getFullYear(), targetDate.getMonth());
 
     // Get budgets for the specified month with category info
     const { data: budgets, error } = await supabase
