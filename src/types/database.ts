@@ -255,6 +255,44 @@ export interface Database {
           updated_at?: string;
         };
       };
+      recurring_expense_overrides: {
+        Row: {
+          id: string;
+          recurring_expense_id: string;
+          user_id: string;
+          override_month: string;
+          override_amount: number | null;
+          is_skipped: boolean;
+          is_manually_confirmed: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          recurring_expense_id: string;
+          user_id: string;
+          override_month: string;
+          override_amount?: number | null;
+          is_skipped?: boolean;
+          is_manually_confirmed?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          recurring_expense_id?: string;
+          user_id?: string;
+          override_month?: string;
+          override_amount?: number | null;
+          is_skipped?: boolean;
+          is_manually_confirmed?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -274,3 +312,4 @@ export type Category = Database["public"]["Tables"]["categories"]["Row"];
 export type CategorizationRule = Database["public"]["Tables"]["categorization_rules"]["Row"];
 export type Budget = Database["public"]["Tables"]["budgets"]["Row"];
 export type RecurringExpense = Database["public"]["Tables"]["recurring_expenses"]["Row"];
+export type RecurringExpenseOverride = Database["public"]["Tables"]["recurring_expense_overrides"]["Row"];
