@@ -362,13 +362,13 @@ async function parsePDFFromBlob(
   userId: string
 ): Promise<ParsedTransaction[]> {
   try {
-    // Convert blob to base64 for internal processing
+    // Convert blob to buffer
     const arrayBuffer = await blob.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-
-    // Use pdf-parse for extraction
-    const pdfParse = (await import("pdf-parse")).default;
     const buffer = Buffer.from(arrayBuffer);
+
+    // Use pdf-parse for extraction (require for CommonJS compatibility)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse");
     const pdfData = await pdfParse(buffer);
     const text = pdfData.text;
 
