@@ -464,7 +464,7 @@ export default function TransactionsPage() {
                     }`}
                   >
                     {/* Mobile Layout */}
-                    <div className="sm:hidden space-y-2">
+                    <div className="md:hidden space-y-2">
                       {/* Row 1: Icon + Name + Amount */}
                       <div className="flex items-center gap-3">
                         <div
@@ -598,7 +598,7 @@ export default function TransactionsPage() {
                     </div>
 
                     {/* Desktop Layout */}
-                    <div className="hidden sm:flex items-center gap-4">
+                    <div className="hidden md:flex items-center gap-4">
                       <div
                         className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
                         style={{
