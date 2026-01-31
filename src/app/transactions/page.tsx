@@ -68,6 +68,7 @@ export default function TransactionsPage() {
     goToCurrentMonth: contextGoToCurrentMonth,
     isCurrentMonth,
     monthLabel,
+    getMonthUrl,
   } = useMonth();
 
   const goToPreviousMonth = () => {
@@ -285,7 +286,7 @@ export default function TransactionsPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Link
-              href="/dashboard"
+              href={getMonthUrl("/dashboard")}
               className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

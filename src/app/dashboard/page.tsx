@@ -77,6 +77,7 @@ export default function DashboardPage() {
     goToNextMonth,
     goToCurrentMonth,
     isCurrentMonth,
+    getMonthUrl,
   } = useMonth();
 
   const fetchDashboard = useCallback(async () => {
@@ -226,7 +227,7 @@ export default function DashboardPage() {
             </button>
 
             <Link
-              href="/budgets"
+              href={getMonthUrl("/budgets")}
               className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,7 +237,7 @@ export default function DashboardPage() {
             </Link>
 
             <Link
-              href="/recurring"
+              href={getMonthUrl("/recurring")}
               className="flex items-center gap-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -352,7 +353,7 @@ export default function DashboardPage() {
                 Wydatki według kategorii
               </h2>
               <Link
-                href="/trends"
+                href={getMonthUrl("/trends")}
                 className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
               >
                 Zobacz trendy
@@ -399,7 +400,7 @@ export default function DashboardPage() {
                 Ostatnie transakcje
               </h2>
               <Link
-                href="/transactions"
+                href={getMonthUrl("/transactions")}
                 className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
               >
                 Zobacz wszystkie
@@ -480,7 +481,7 @@ export default function DashboardPage() {
                 Postęp budżetu
               </h2>
               <Link
-                href="/budgets"
+                href={getMonthUrl("/budgets")}
                 className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
               >
                 Zarządzaj budżetami

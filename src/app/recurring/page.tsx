@@ -100,6 +100,7 @@ export default function RecurringExpensesPage() {
     isCurrentMonth,
     monthLabel,
     monthParam,
+    getMonthUrl,
   } = useMonth();
 
   // Use the context's monthParam (YYYY-MM format) for API calls
@@ -302,7 +303,7 @@ export default function RecurringExpensesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href="/dashboard"
+                href={getMonthUrl("/dashboard")}
                 className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               >
                 <svg

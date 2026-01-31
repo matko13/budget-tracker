@@ -18,6 +18,9 @@ interface MonthContextType {
   isCurrentMonth: boolean;
   monthLabel: string;
   monthParam: string; // YYYY-MM format for API calls
+  
+  // URL helper - generates path with month param preserved
+  getMonthUrl: (path: string) => string;
 }
 
 const MonthContext = createContext<MonthContextType | null>(null);
@@ -136,6 +139,14 @@ export function MonthProvider({ children }: { children: ReactNode }) {
   // YYYY-MM format for API calls
   const monthParam = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
 
+  // Generate URL with month param preserved
+  const getMonthUrl = useCallback((path: string) => {
+    if (isCurrentMonth) {
+      return path;
+    }
+    return `${path}?month=${monthParam}`;
+  }, [isCurrentMonth, monthParam]);
+
   return (
     <MonthContext.Provider
       value={{
@@ -148,6 +159,7 @@ export function MonthProvider({ children }: { children: ReactNode }) {
         isCurrentMonth,
         monthLabel,
         monthParam,
+        getMonthUrl,
       }}
     >
       {children}

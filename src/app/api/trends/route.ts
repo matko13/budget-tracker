@@ -85,10 +85,10 @@ export async function GET() {
 
     const categoryTrends: Record<string, { name: string; color: string; current: number; previous: number }> = {};
 
-    (transactions || [])
-      .filter((t: { type: string }) => t.type === "expense")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .forEach((t: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ((transactions || []) as any[])
+      .filter((t) => t.type === "expense")
+      .forEach((t) => {
         const categoryName = t.categories?.name || "Uncategorized";
         const categoryColor = t.categories?.color || "#94a3b8";
 

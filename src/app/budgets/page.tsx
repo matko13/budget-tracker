@@ -55,6 +55,7 @@ export default function BudgetsPage() {
     isCurrentMonth,
     monthLabel,
     monthParam,
+    getMonthUrl,
   } = useMonth();
 
   const fetchData = useCallback(async () => {
