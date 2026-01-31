@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { createUntypedClient } from "@/lib/supabase/server-untyped";
-import { parsePDF, ParsedTransaction } from "@/lib/pdf-parser";
 
-// Force dynamic to avoid build-time evaluation of pdf-parse
+// Force dynamic to avoid build-time evaluation
 export const dynamic = "force-dynamic";
+
+// Type definition to avoid importing from pdf-parser at build time
+interface ParsedTransaction {
+  date: string;
+  amount: number;
+  description: string;
+  merchantName: string | null;
+  type: "income" | "expense";
+  currency: string;
+}
 
 export async function POST(request: Request) {
   try {
@@ -35,6 +44,9 @@ export async function POST(request: Request) {
     const arrayBuffer = await file!.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // Dynamic import of pdf-parser to avoid build-time evaluation
+    const { parsePDF } = await import("@/lib/pdf-parser");
+    
     // Parse PDF
     const parseResult = await parsePDF(buffer);
 
