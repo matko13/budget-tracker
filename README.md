@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BudgetTracker
+
+A modern budget tracking web app for managing your personal finances. Import transactions from your bank's CSV export or add them manually.
+
+## Features
+
+- **Manual Accounts**: Create and manage multiple accounts with custom balances
+- **CSV Import**: Import transactions from bank CSV exports
+- **Smart Categorization**: Rule-based automatic categorization with Polish merchant recognition
+- **Dashboard**: Visual overview of balances, income, expenses, and spending by category
+- **Transaction Management**: Search, filter, and manually categorize transactions
+- **Budgets**: Set monthly budgets per category and track your spending
+- **Recurring Expenses**: Track and monitor recurring payments
+
+## Tech Stack
+
+- **Frontend/Backend**: Next.js 15 with App Router
+- **Database**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Styling**: Tailwind CSS
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+- Supabase account
+
+### 1. Clone and Install
+
+```bash
+git clone <repository-url>
+cd budget
+npm install
+```
+
+### 2. Set Up Supabase
+
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Go to SQL Editor and run the schema from `supabase/schema.sql`
+3. Copy your project URL and anon key from Settings > API
+
+### 3. Configure Environment Variables
+
+Create a `.env.local` file in the root directory:
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# App URL
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+### 4. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── api/               # API routes
+│   │   ├── accounts/      # Account management
+│   │   ├── categories/    # Category management
+│   │   ├── dashboard/     # Dashboard data
+│   │   └── transactions/  # Transaction endpoints
+│   ├── auth/              # Auth callback
+│   ├── accounts/          # Accounts page
+│   ├── budgets/           # Budget management
+│   ├── dashboard/         # Main dashboard
+│   ├── import/            # CSV import
+│   ├── login/             # Login page
+│   ├── signup/            # Signup page
+│   └── transactions/      # Transactions list
+├── lib/                   # Utility libraries
+│   ├── supabase/          # Supabase clients
+│   └── mt940-parser.ts    # Bank statement parser
+└── types/                 # TypeScript types
+    └── database.ts        # Database schema types
+```
 
-## Learn More
+## Deployment
 
-To learn more about Next.js, take a look at the following resources:
+### Deploy to Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Push your code to GitHub
+2. Import the project to [Vercel](https://vercel.com)
+3. Add environment variables in Vercel's project settings
+4. Deploy!
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Remember to update `NEXT_PUBLIC_APP_URL` to your production URL.
 
-## Deploy on Vercel
+## Database Schema
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The app uses the following main tables:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **accounts**: User accounts with balances
+- **transactions**: Transaction records with categorization
+- **categories**: Expense/income categories (system + custom)
+- **categorization_rules**: Keywords for auto-categorization
+- **budgets**: Budget goals per category
+- **recurring_expenses**: Recurring payment tracking
+
+## Security
+
+- All data is protected with Row Level Security (RLS) in Supabase
+- Sessions are managed securely via Supabase Auth
+
+## License
+
+MIT
