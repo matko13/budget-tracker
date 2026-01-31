@@ -3,6 +3,9 @@ import { createUntypedClient } from "@/lib/supabase/server-untyped";
 import JSZip from "jszip";
 import { parseMT940, ParsedTransaction } from "@/lib/mt940-parser";
 
+// Force dynamic to avoid build-time evaluation of pdf-parse
+export const dynamic = "force-dynamic";
+
 interface FileResult {
   filename: string;
   type: "csv" | "pdf" | "mt940";

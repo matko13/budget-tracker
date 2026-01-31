@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { createUntypedClient } from "@/lib/supabase/server-untyped";
 import { parsePDF, ParsedTransaction } from "@/lib/pdf-parser";
 
+// Force dynamic to avoid build-time evaluation of pdf-parse
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
     const supabase = await createUntypedClient();
