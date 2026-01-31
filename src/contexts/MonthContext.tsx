@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 interface MonthContextType {
@@ -38,19 +38,38 @@ function parseMonthParam(param: string | null): { month: number; year: number } 
   return { month: month - 1, year }; // Convert to 0-indexed month
 }
 
+// Get current date in a stable way for SSR
+function getCurrentDate() {
+  const now = new Date();
+  return { month: now.getMonth(), year: now.getFullYear() };
+}
+
 export function MonthProvider({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   
-  // Initialize from URL or current date
-  const now = new Date();
-  const urlMonth = parseMonthParam(searchParams.get("month"));
+  // Initialize with current date (safe for SSR - same on server and client)
+  const [selectedMonth, setSelectedMonth] = useState(() => getCurrentDate().month);
+  const [selectedYear, setSelectedYear] = useState(() => getCurrentDate().year);
   
-  const [selectedMonth, setSelectedMonth] = useState(urlMonth?.month ?? now.getMonth());
-  const [selectedYear, setSelectedYear] = useState(urlMonth?.year ?? now.getFullYear());
+  // Track if we've synced from URL (to avoid unnecessary updates)
+  const hasSyncedFromUrl = useRef(false);
 
-  // Update URL when month changes
+  // Sync state from URL on mount and when URL changes
+  useEffect(() => {
+    const urlMonth = parseMonthParam(searchParams.get("month"));
+    if (urlMonth) {
+      setSelectedMonth(urlMonth.month);
+      setSelectedYear(urlMonth.year);
+    } else if (!hasSyncedFromUrl.current) {
+      // No month param - keep current month (already set)
+      // Only set if we haven't synced yet to avoid loops
+    }
+    hasSyncedFromUrl.current = true;
+  }, [searchParams]);
+
+  // Update URL when month changes (called from user actions only)
   const updateUrl = useCallback((month: number, year: number) => {
     const monthParam = `${year}-${String(month + 1).padStart(2, "0")}`;
     const now = new Date();
@@ -72,20 +91,6 @@ export function MonthProvider({ children }: { children: ReactNode }) {
     // Use replace to avoid cluttering browser history with every month change
     router.replace(newUrl, { scroll: false });
   }, [searchParams, pathname, router]);
-
-  // Sync state from URL on mount and when URL changes
-  useEffect(() => {
-    const urlMonth = parseMonthParam(searchParams.get("month"));
-    if (urlMonth) {
-      setSelectedMonth(urlMonth.month);
-      setSelectedYear(urlMonth.year);
-    } else {
-      // No month param means current month
-      const now = new Date();
-      setSelectedMonth(now.getMonth());
-      setSelectedYear(now.getFullYear());
-    }
-  }, [searchParams]);
 
   const goToPreviousMonth = useCallback(() => {
     setSelectedMonth((prevMonth) => {

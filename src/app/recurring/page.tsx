@@ -838,7 +838,8 @@ export default function RecurringExpensesPage() {
         isOpen={showModal}
         onClose={handleModalClose}
         onSuccess={handleModalSuccess}
-        recurringExpense={editingExpense}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        recurringExpense={editingExpense as any}
       />
 
       {/* Override Modal */}
