@@ -1,6 +1,5 @@
 // PDF Parser for Bank Statements and Receipts
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pdfParse = require("pdf-parse");
+// pdf-parse is loaded lazily to avoid build-time canvas dependency issues
 
 export interface ParsedTransaction {
   date: string;
@@ -322,6 +321,10 @@ export async function parsePDF(buffer: Buffer): Promise<PDFParseResult> {
   const errors: string[] = [];
   
   try {
+    // Lazy load pdf-parse to avoid build-time canvas dependency
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfParse = require("pdf-parse");
+    
     // Extract text from PDF
     const data = await pdfParse(buffer);
     const text = data.text;

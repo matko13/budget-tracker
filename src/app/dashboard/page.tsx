@@ -486,7 +486,7 @@ export default function DashboardPage() {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data.budgets.slice(0, 6).map((budget) => (
+              {data.budgets.map((budget) => (
                 <div
                   key={budget.id}
                   className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm"
