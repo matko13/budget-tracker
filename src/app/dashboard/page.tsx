@@ -48,7 +48,8 @@ interface Budget {
 
 interface DashboardData {
   accounts: Account[];
-  totalBalance: number;
+  monthlyBalance: number;
+  savingsRate: number;
   monthlyIncome: number;
   monthlyExpenses: number;
   categoryBreakdown: Array<{ name: string; amount: number; color: string }>;
@@ -297,18 +298,31 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                (data?.monthlyBalance || 0) >= 0 
+                  ? "bg-blue-100 dark:bg-blue-900/30" 
+                  : "bg-orange-100 dark:bg-orange-900/30"
+              }`}>
+                <svg className={`w-6 h-6 ${
+                  (data?.monthlyBalance || 0) >= 0 ? "text-blue-600" : "text-orange-600"
+                }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <span className="text-slate-600 dark:text-slate-400">Całkowite saldo</span>
+              <span className="text-slate-600 dark:text-slate-400">Bilans miesięczny</span>
             </div>
-            <p className="text-3xl font-bold text-slate-900 dark:text-white">
-              {formatCurrency(data?.totalBalance || 0)}
+            <p className={`text-3xl font-bold ${
+              (data?.monthlyBalance || 0) >= 0 
+                ? "text-blue-600" 
+                : "text-orange-600"
+            }`}>
+              {(data?.monthlyBalance || 0) >= 0 ? "+" : ""}{formatCurrency(data?.monthlyBalance || 0)}
             </p>
             <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">
-              Na {data?.accounts.length || 0} koncie(ach)
+              {(data?.savingsRate || 0) >= 0 
+                ? `${data?.savingsRate || 0}% oszczędności`
+                : `${Math.abs(data?.savingsRate || 0)}% ponad przychody`
+              }
             </p>
           </div>
 

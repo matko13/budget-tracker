@@ -488,49 +488,206 @@ export default function RecurringExpensesPage() {
               {data.recurringExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className={`flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                  className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
                     !expense.is_active ? "opacity-50" : ""
                   }`}
                 >
-                  {/* Category Icon */}
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                    style={{
-                      backgroundColor: expense.categories?.color
-                        ? `${expense.categories.color}20`
-                        : "#f1f5f9",
-                    }}
-                  >
-                    {expense.categories?.icon || "📅"}
+                  {/* Mobile Layout */}
+                  <div className="sm:hidden">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                        style={{
+                          backgroundColor: expense.categories?.color
+                            ? `${expense.categories.color}20`
+                            : "#f1f5f9",
+                        }}
+                      >
+                        {expense.categories?.icon || "📅"}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 dark:text-white truncate">
+                              {expense.name}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              {intervalLabels[expense.interval_months] || "Co miesiąc"}
+                              {expense.day_of_month && ` • Dzień ${expense.day_of_month}`}
+                            </p>
+                          </div>
+                          <p className={`font-semibold text-right flex-shrink-0 ${expense.isSkipped ? "line-through text-slate-400" : "text-slate-900 dark:text-white"}`}>
+                            {formatCurrency(expense.effectiveAmount, expense.currency)}
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center flex-wrap gap-1.5 mt-2">
+                          {!expense.is_active && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">
+                              Nieaktywny
+                            </span>
+                          )}
+                          {expense.isSkipped ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">
+                              Pominięto
+                            </span>
+                          ) : expense.isPaidThisMonth ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                              {expense.hasCompletedPayment ? "Opłacone" : "Potwierdzone"}
+                            </span>
+                          ) : expense.isOverdue ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                              Zaległe
+                            </span>
+                          ) : expense.is_active && expense.isDueThisMonth && expense.isDueToday ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                              Termin dzisiaj
+                            </span>
+                          ) : expense.is_active && expense.isDueThisMonth ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                              Oczekuje
+                            </span>
+                          ) : expense.is_active ? (
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                              Nie w tym miesiącu
+                            </span>
+                          ) : null}
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                            {expense.categories?.name || "Bez kategorii"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-end gap-1.5 mt-3 pt-2 border-t border-slate-100 dark:border-slate-700/50">
+                      {expense.is_active && expense.isDueThisMonth && !expense.isSkipped && !expense.hasCompletedPayment && (
+                        <button
+                          onClick={() => handleMarkAsPaid(expense)}
+                          title={expense.isManuallyConfirmed ? "Cofnij potwierdzenie" : "Oznacz jako opłacone"}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            expense.isManuallyConfirmed
+                              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                              : expense.isOverdue
+                                ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                : "bg-slate-100 dark:bg-slate-700 text-slate-400"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      )}
+                      {expense.is_active && expense.isDueThisMonth && (
+                        <button
+                          onClick={() => handleToggleSkip(expense)}
+                          title={expense.isSkipped ? "Przywróć w tym miesiącu" : "Pomiń w tym miesiącu"}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            expense.isSkipped
+                              ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                              : "bg-slate-100 dark:bg-slate-700 text-slate-400"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        </button>
+                      )}
+                      {expense.is_active && expense.isDueThisMonth && !expense.isSkipped && (
+                        <button
+                          onClick={() => handleOpenOverride(expense)}
+                          title="Zmień kwotę na ten miesiąc"
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            expense.override?.override_amount !== null && expense.override?.override_amount !== undefined
+                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                              : "bg-slate-100 dark:bg-slate-700 text-slate-400"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleToggleActive(expense)}
+                        title={expense.is_active ? "Dezaktywuj" : "Aktywuj"}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          expense.is_active
+                            ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                            : "bg-slate-100 dark:bg-slate-700 text-slate-400"
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {expense.is_active ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          )}
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleEdit(expense)}
+                        title="Edytuj"
+                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(expense.id)}
+                        disabled={deletingId === expense.id}
+                        title="Usuń"
+                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-900 dark:text-white truncate">
-                        {expense.name}
+                  {/* Desktop Layout */}
+                  <div className="hidden sm:flex items-center gap-4">
+                    {/* Category Icon */}
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                      style={{
+                        backgroundColor: expense.categories?.color
+                          ? `${expense.categories.color}20`
+                          : "#f1f5f9",
+                      }}
+                    >
+                      {expense.categories?.icon || "📅"}
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-900 dark:text-white truncate">
+                          {expense.name}
+                        </p>
+                        {!expense.is_active && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex-shrink-0">
+                            Nieaktywny
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {expense.categories?.name || "Bez kategorii"}
+                        {" • "}
+                        {intervalLabels[expense.interval_months] || "Co miesiąc"}
+                        {expense.day_of_month && ` • Dzień ${expense.day_of_month}`}
                       </p>
-                      {!expense.is_active && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 flex-shrink-0">
-                          Nieaktywny
-                        </span>
+                      {expense.match_keywords?.length > 0 && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          Słowa kluczowe: {expense.match_keywords.join(", ")}
+                        </p>
                       )}
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {expense.categories?.name || "Bez kategorii"}
-                      {" • "}
-                      {intervalLabels[expense.interval_months] || "Co miesiąc"}
-                      {expense.day_of_month && ` • Dzień ${expense.day_of_month}`}
-                    </p>
-                    {expense.match_keywords?.length > 0 && (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                        Słowa kluczowe: {expense.match_keywords.join(", ")}
-                      </p>
-                    )}
-                  </div>
 
-                  {/* Status */}
-                  <div className="flex-shrink-0 text-right">
+                    {/* Status */}
+                    <div className="flex-shrink-0 text-right">
                     {expense.isSkipped ? (
                       <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -772,16 +929,17 @@ export default function RecurringExpensesPage() {
                     </button>
                   </div>
 
-                  {/* Amount */}
-                  <div className="text-right min-w-[100px]">
-                    <p className={`font-semibold ${expense.isSkipped ? "line-through text-slate-400" : "text-slate-900 dark:text-white"}`}>
-                      {formatCurrency(expense.effectiveAmount, expense.currency)}
-                    </p>
-                    {expense.override?.override_amount !== null && expense.override?.override_amount !== undefined && expense.effectiveAmount !== expense.amount && (
-                      <p className="text-xs text-slate-400 line-through">
-                        {formatCurrency(expense.amount, expense.currency)}
+                    {/* Amount */}
+                    <div className="text-right min-w-[100px]">
+                      <p className={`font-semibold ${expense.isSkipped ? "line-through text-slate-400" : "text-slate-900 dark:text-white"}`}>
+                        {formatCurrency(expense.effectiveAmount, expense.currency)}
                       </p>
-                    )}
+                      {expense.override?.override_amount !== null && expense.override?.override_amount !== undefined && expense.effectiveAmount !== expense.amount && (
+                        <p className="text-xs text-slate-400 line-through">
+                          {formatCurrency(expense.amount, expense.currency)}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

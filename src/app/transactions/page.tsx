@@ -455,7 +455,7 @@ export default function TransactionsPage() {
                 {data.transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className={`flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                    className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
                       transaction.is_excluded ? "opacity-60" : ""
                     } ${
                       transaction.is_recurring_generated && transaction.payment_status === "planned"
@@ -463,146 +463,278 @@ export default function TransactionsPage() {
                         : ""
                     }`}
                   >
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                      style={{
-                        backgroundColor: transaction.categories?.color
-                          ? `${transaction.categories.color}20`
-                          : "#f1f5f9",
-                      }}
-                    >
-                      {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-slate-900 dark:text-white truncate">
-                          {transaction.merchant_name || transaction.description}
+                    {/* Mobile Layout */}
+                    <div className="sm:hidden space-y-2">
+                      {/* Row 1: Icon + Name + Amount */}
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+                          style={{
+                            backgroundColor: transaction.categories?.color
+                              ? `${transaction.categories.color}20`
+                              : "#f1f5f9",
+                          }}
+                        >
+                          {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-slate-900 dark:text-white truncate text-sm">
+                            {transaction.merchant_name || transaction.description}
+                          </p>
+                        </div>
+                        <p
+                          className={`font-semibold shrink-0 text-sm ${
+                            transaction.is_excluded
+                              ? "text-slate-400 dark:text-slate-500"
+                              : transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "text-amber-600 dark:text-amber-400"
+                              : transaction.type === "income"
+                              ? "text-emerald-600"
+                              : "text-red-500 dark:text-red-400"
+                          }`}
+                        >
+                          {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount, transaction.currency)}
                         </p>
-                        {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex-shrink-0">
-                            Zaplanowane
-                          </span>
-                        )}
-                        {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
-                            Cykliczny
-                          </span>
-                        )}
-                        {transaction.is_excluded && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex-shrink-0">
-                            Przelew
-                          </span>
+                      </div>
+                      
+                      {/* Row 2: Date + Category */}
+                      <div className="flex items-center gap-2 pl-[52px] text-xs text-slate-500 dark:text-slate-400">
+                        <span>{formatDate(transaction.transaction_date)}</span>
+                        <span>•</span>
+                        {editingTransaction === transaction.id ? (
+                          <select
+                            value={transaction.categories?.id || ""}
+                            onChange={(e) => handleCategoryChange(transaction.id, e.target.value)}
+                            onBlur={() => setEditingTransaction(null)}
+                            autoFocus
+                            className="px-2 py-0.5 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-xs"
+                          >
+                            <option value="">Bez kategorii</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.icon} {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => setEditingTransaction(transaction.id)}
+                            className="text-slate-600 dark:text-slate-400"
+                          >
+                            {transaction.categories?.name || "Bez kategorii"}
+                          </button>
                         )}
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
-                        {transaction.description}
-                      </p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                        {formatDate(transaction.transaction_date)}
-                        {transaction.accounts?.name && ` • ${transaction.accounts.name}`}
-                      </p>
+                      
+                      {/* Row 3: Badges + Actions */}
+                      <div className="flex items-center justify-between pl-[52px]">
+                        <div className="flex items-center gap-1.5">
+                          {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                              Zaplanowane
+                            </span>
+                          )}
+                          {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                              Cykliczny
+                            </span>
+                          )}
+                          {transaction.is_excluded && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                              Przelew
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {transaction.is_recurring_generated && (
+                            <button
+                              onClick={() => handleTogglePaymentStatus(transaction.id, transaction.payment_status)}
+                              className={`p-1.5 rounded-lg ${
+                                transaction.payment_status === "completed"
+                                  ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                                  : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                              }`}
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {transaction.payment_status === "completed" ? (
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                ) : (
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                )}
+                              </svg>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditClick(transaction)}
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTransaction(transaction.id)}
+                            disabled={deletingTransaction === transaction.id}
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 disabled:opacity-50"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleToggleExcluded(transaction.id, transaction.is_excluded)}
+                            className={`p-1.5 rounded-lg ${
+                              transaction.is_excluded
+                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                                : "bg-slate-100 dark:bg-slate-700 text-slate-400"
+                            }`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {/* Mark as Paid/Planned Toggle - only for recurring generated transactions */}
-                      {transaction.is_recurring_generated && (
+                    {/* Desktop Layout */}
+                    <div className="hidden sm:flex items-center gap-4">
+                      <div
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                        style={{
+                          backgroundColor: transaction.categories?.color
+                            ? `${transaction.categories.color}20`
+                            : "#f1f5f9",
+                        }}
+                      >
+                        {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900 dark:text-white truncate">
+                            {transaction.merchant_name || transaction.description}
+                          </p>
+                          {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex-shrink-0">
+                              Zaplanowane
+                            </span>
+                          )}
+                          {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                              Cykliczny
+                            </span>
+                          )}
+                          {transaction.is_excluded && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 flex-shrink-0">
+                              Przelew
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 truncate">
+                          {transaction.description}
+                        </p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          {formatDate(transaction.transaction_date)}
+                          {transaction.accounts?.name && ` • ${transaction.accounts.name}`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {transaction.is_recurring_generated && (
+                          <button
+                            onClick={() => handleTogglePaymentStatus(transaction.id, transaction.payment_status)}
+                            title={transaction.payment_status === "planned" ? "Oznacz jako opłacone" : "Oznacz jako zaplanowane"}
+                            className={`p-1.5 rounded-lg transition-colors ${
+                              transaction.payment_status === "completed"
+                                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-400"
+                            }`}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              {transaction.payment_status === "completed" ? (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              ) : (
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              )}
+                            </svg>
+                          </button>
+                        )}
+
                         <button
-                          onClick={() => handleTogglePaymentStatus(transaction.id, transaction.payment_status)}
-                          title={transaction.payment_status === "planned" ? "Oznacz jako opłacone" : "Oznacz jako zaplanowane"}
+                          onClick={() => handleEditClick(transaction)}
+                          title="Edytuj transakcję"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteTransaction(transaction.id)}
+                          disabled={deletingTransaction === transaction.id}
+                          title="Usuń transakcję"
+                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+
+                        <button
+                          onClick={() => handleToggleExcluded(transaction.id, transaction.is_excluded)}
+                          title={transaction.is_excluded ? "Uwzględnij w sumach" : "Wyklucz z sum (przelew wewnętrzny)"}
                           className={`p-1.5 rounded-lg transition-colors ${
-                            transaction.payment_status === "completed"
-                              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                              : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-400"
+                            transaction.is_excluded
+                              ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                              : "bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-blue-600"
                           }`}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            {transaction.payment_status === "completed" ? (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            ) : (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            )}
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                           </svg>
                         </button>
-                      )}
 
-                      {/* Edit Button */}
-                      <button
-                        onClick={() => handleEditClick(transaction)}
-                        title="Edytuj transakcję"
-                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDeleteTransaction(transaction.id)}
-                        disabled={deletingTransaction === transaction.id}
-                        title="Usuń transakcję"
-                        className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-
-                      {/* Exclude Toggle */}
-                      <button
-                        onClick={() => handleToggleExcluded(transaction.id, transaction.is_excluded)}
-                        title={transaction.is_excluded ? "Uwzględnij w sumach" : "Wyklucz z sum (przelew wewnętrzny)"}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          transaction.is_excluded
-                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                            : "bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-blue-600"
-                        }`}
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                      </button>
-
-                      {/* Category */}
-                      {editingTransaction === transaction.id ? (
-                        <select
-                          value={transaction.categories?.id || ""}
-                          onChange={(e) => handleCategoryChange(transaction.id, e.target.value)}
-                          onBlur={() => setEditingTransaction(null)}
-                          autoFocus
-                          className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white"
+                        {editingTransaction === transaction.id ? (
+                          <select
+                            value={transaction.categories?.id || ""}
+                            onChange={(e) => handleCategoryChange(transaction.id, e.target.value)}
+                            onBlur={() => setEditingTransaction(null)}
+                            autoFocus
+                            className="px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white"
+                          >
+                            <option value="">Bez kategorii</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.icon} {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => setEditingTransaction(transaction.id)}
+                            className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-sm text-slate-600 dark:text-slate-400 transition-colors"
+                          >
+                            {transaction.categories?.name || "Bez kategorii"}
+                          </button>
+                        )}
+                        
+                        <p
+                          className={`font-semibold text-right min-w-[100px] ${
+                            transaction.is_excluded
+                              ? "text-slate-400 dark:text-slate-500"
+                              : transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "text-amber-600 dark:text-amber-400 italic"
+                              : transaction.type === "income"
+                              ? "text-emerald-600"
+                              : "text-slate-900 dark:text-white"
+                          }`}
                         >
-                          <option value="">Bez kategorii</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.icon} {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <button
-                          onClick={() => setEditingTransaction(transaction.id)}
-                          className="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-sm text-slate-600 dark:text-slate-400 transition-colors"
-                        >
-                          {transaction.categories?.name || "Bez kategorii"}
-                        </button>
-                      )}
-                      
-                      <p
-                        className={`font-semibold text-right min-w-[100px] ${
-                          transaction.is_excluded
-                            ? "text-slate-400 dark:text-slate-500"
-                            : transaction.is_recurring_generated && transaction.payment_status === "planned"
-                            ? "text-amber-600 dark:text-amber-400 italic"
-                            : transaction.type === "income"
-                            ? "text-emerald-600"
-                            : "text-slate-900 dark:text-white"
-                        }`}
-                      >
-                        {transaction.type === "income" ? "+" : "-"}
-                        {formatCurrency(transaction.amount, transaction.currency)}
-                      </p>
+                          {transaction.type === "income" ? "+" : "-"}
+                          {formatCurrency(transaction.amount, transaction.currency)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}
