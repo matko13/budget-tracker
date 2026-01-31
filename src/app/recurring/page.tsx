@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AddRecurringModal from "@/components/AddRecurringModal";
+import { useMonth } from "@/contexts/MonthContext";
 
 interface Category {
   id: string;
@@ -41,12 +42,15 @@ interface RecurringExpense {
   isOverdue: boolean;
   isManuallyConfirmed: boolean;
   hasLinkedTransaction: boolean;
+  hasCompletedPayment: boolean;
   effectiveAmount: number;
   override: Override | null;
   matchedTransaction?: {
     id: string;
     transaction_date: string;
     amount: number;
+    payment_status: string | null;
+    is_recurring_generated: boolean;
   };
 }
 
@@ -68,24 +72,11 @@ const intervalLabels: Record<number, string> = {
   12: "Rocznie",
 };
 
-// Helper to format month for display
+// Helper to format month for display (for override modal)
 function formatMonthDisplay(monthStr: string): string {
   const [year, month] = monthStr.split("-").map(Number);
   const date = new Date(year, month - 1);
   return date.toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
-}
-
-// Helper to get previous/next month
-function getAdjacentMonth(monthStr: string, direction: -1 | 1): string {
-  const [year, month] = monthStr.split("-").map(Number);
-  const date = new Date(year, month - 1 + direction);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-// Get current month string
-function getCurrentMonth(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
 export default function RecurringExpensesPage() {
@@ -96,17 +87,29 @@ export default function RecurringExpensesPage() {
     null
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth());
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [overrideExpense, setOverrideExpense] = useState<RecurringExpense | null>(null);
   const [rematching, setRematching] = useState(false);
   const [rematchResult, setRematchResult] = useState<string | null>(null);
   const router = useRouter();
 
-  const fetchRecurringExpenses = useCallback(async (month: string) => {
+  const {
+    goToPreviousMonth,
+    goToNextMonth,
+    goToCurrentMonth,
+    isCurrentMonth,
+    monthLabel,
+    monthParam,
+  } = useMonth();
+
+  // Use the context's monthParam (YYYY-MM format) for API calls
+  const selectedMonth = monthParam;
+  const displayMonth = monthLabel;
+
+  const fetchRecurringExpenses = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/recurring?month=${month}`, {
+      const response = await fetch(`/api/recurring?month=${monthParam}`, {
         cache: "no-store",
         headers: {
           "Cache-Control": "no-cache",
@@ -126,22 +129,22 @@ export default function RecurringExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, monthParam]);
 
   useEffect(() => {
-    fetchRecurringExpenses(selectedMonth);
-  }, [fetchRecurringExpenses, selectedMonth]);
+    fetchRecurringExpenses();
+  }, [fetchRecurringExpenses]);
 
   const handlePrevMonth = () => {
-    setSelectedMonth(getAdjacentMonth(selectedMonth, -1));
+    goToPreviousMonth();
   };
 
   const handleNextMonth = () => {
-    setSelectedMonth(getAdjacentMonth(selectedMonth, 1));
+    goToNextMonth();
   };
 
   const handleGoToCurrentMonth = () => {
-    setSelectedMonth(getCurrentMonth());
+    goToCurrentMonth();
   };
 
   const handleOpenOverride = (expense: RecurringExpense) => {
@@ -164,7 +167,7 @@ export default function RecurringExpensesPage() {
       });
 
       if (response.ok) {
-        fetchRecurringExpenses(selectedMonth);
+        fetchRecurringExpenses();
       }
     } catch (error) {
       console.error("Error toggling skip:", error);
@@ -186,7 +189,7 @@ export default function RecurringExpensesPage() {
       });
 
       if (response.ok) {
-        fetchRecurringExpenses(selectedMonth);
+        fetchRecurringExpenses();
       }
     } catch (error) {
       console.error("Error marking as paid:", error);
@@ -210,7 +213,7 @@ export default function RecurringExpensesPage() {
       });
 
       if (response.ok) {
-        fetchRecurringExpenses(selectedMonth);
+        fetchRecurringExpenses();
       } else {
         const responseData = await response.json();
         alert(responseData.error || "Nie udało się usunąć wydatku cyklicznego");
@@ -235,7 +238,7 @@ export default function RecurringExpensesPage() {
       });
 
       if (response.ok) {
-        fetchRecurringExpenses(selectedMonth);
+        fetchRecurringExpenses();
       }
     } catch (error) {
       console.error("Error toggling active status:", error);
@@ -248,7 +251,7 @@ export default function RecurringExpensesPage() {
   };
 
   const handleModalSuccess = () => {
-    fetchRecurringExpenses(selectedMonth);
+    fetchRecurringExpenses();
   };
 
   const handleOverrideModalClose = () => {
@@ -257,7 +260,7 @@ export default function RecurringExpensesPage() {
   };
 
   const handleOverrideSuccess = () => {
-    fetchRecurringExpenses(selectedMonth);
+    fetchRecurringExpenses();
   };
 
   const handleRematch = async () => {
@@ -270,7 +273,7 @@ export default function RecurringExpensesPage() {
       const result = await response.json();
       if (response.ok) {
         setRematchResult(result.message);
-        fetchRecurringExpenses(selectedMonth);
+        fetchRecurringExpenses();
       } else {
         setRematchResult(result.error || "Błąd podczas dopasowywania");
       }
@@ -290,9 +293,6 @@ export default function RecurringExpensesPage() {
       currency,
     }).format(amount);
   };
-
-  const displayMonth = formatMonthDisplay(selectedMonth);
-  const isCurrentMonth = selectedMonth === getCurrentMonth();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -541,8 +541,8 @@ export default function RecurringExpensesPage() {
                       </span>
                     ) : expense.isPaidThisMonth ? (
                       <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
-                        {expense.hasLinkedTransaction ? (
-                          // Checkmark icon for bank-linked payment
+                        {expense.hasCompletedPayment ? (
+                          // Checkmark icon for completed payment (bank or manually marked on transaction)
                           <svg
                             className="w-3.5 h-3.5"
                             fill="none"
@@ -557,7 +557,7 @@ export default function RecurringExpensesPage() {
                             />
                           </svg>
                         ) : (
-                          // Hand/manual icon for manually confirmed
+                          // Circle-check icon for manually confirmed via recurring page
                           <svg
                             className="w-3.5 h-3.5"
                             fill="none"
@@ -572,7 +572,7 @@ export default function RecurringExpensesPage() {
                             />
                           </svg>
                         )}
-                        {expense.hasLinkedTransaction ? "Opłacone" : "Potwierdzone"}
+                        {expense.hasCompletedPayment ? "Opłacone" : "Potwierdzone"}
                       </span>
                     ) : expense.isOverdue ? (
                       // Overdue - red warning
@@ -642,8 +642,8 @@ export default function RecurringExpensesPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {/* Mark as Paid button - show for overdue/due-today/upcoming expenses that aren't paid or skipped */}
-                    {expense.is_active && expense.isDueThisMonth && !expense.isSkipped && !expense.hasLinkedTransaction && (
+                    {/* Mark as Paid button - show for overdue/due-today/upcoming expenses that aren't paid via bank or skipped */}
+                    {expense.is_active && expense.isDueThisMonth && !expense.isSkipped && !expense.hasCompletedPayment && (
                       <button
                         onClick={() => handleMarkAsPaid(expense)}
                         title={expense.isManuallyConfirmed ? "Cofnij potwierdzenie" : "Oznacz jako opłacone"}

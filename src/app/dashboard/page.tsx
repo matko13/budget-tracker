@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import AddTransactionModal from "@/components/AddTransactionModal";
+import { useMonth } from "@/contexts/MonthContext";
 
 interface Account {
   id: string;
@@ -32,6 +33,8 @@ interface Transaction {
   transaction_date: string;
   type: "income" | "expense" | "transfer";
   categories: Category | null;
+  payment_status: "completed" | "planned" | "skipped" | null;
+  is_recurring_generated: boolean;
 }
 
 interface Budget {
@@ -60,21 +63,25 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
-  const now = new Date();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const router = useRouter();
   const supabase = createClient();
+  
+  const {
+    selectedMonth,
+    selectedYear,
+    goToPreviousMonth,
+    goToNextMonth,
+    goToCurrentMonth,
+    isCurrentMonth,
+  } = useMonth();
 
-  const fetchDashboard = useCallback(async (month?: number, year?: number) => {
-    const m = month ?? selectedMonth;
-    const y = year ?? selectedYear;
+  const fetchDashboard = useCallback(async () => {
     try {
-      const response = await fetch(`/api/dashboard?month=${m}&year=${y}`);
+      const response = await fetch(`/api/dashboard?month=${selectedMonth}&year=${selectedYear}`);
       if (!response.ok) {
         if (response.status === 401) {
           router.push("/login");
@@ -99,39 +106,12 @@ export default function DashboardPage() {
       }
     };
     getUser();
+  }, [supabase.auth]);
+
+  useEffect(() => {
+    setLoading(true);
     fetchDashboard();
-  }, [fetchDashboard, supabase.auth]);
-
-  const goToPreviousMonth = () => {
-    let newMonth = selectedMonth - 1;
-    let newYear = selectedYear;
-    if (newMonth < 0) {
-      newMonth = 11;
-      newYear -= 1;
-    }
-    setSelectedMonth(newMonth);
-    setSelectedYear(newYear);
-    fetchDashboard(newMonth, newYear);
-  };
-
-  const goToNextMonth = () => {
-    let newMonth = selectedMonth + 1;
-    let newYear = selectedYear;
-    if (newMonth > 11) {
-      newMonth = 0;
-      newYear += 1;
-    }
-    setSelectedMonth(newMonth);
-    setSelectedYear(newYear);
-    fetchDashboard(newMonth, newYear);
-  };
-
-  const goToCurrentMonth = () => {
-    const now = new Date();
-    setSelectedMonth(now.getMonth());
-    setSelectedYear(now.getFullYear());
-    fetchDashboard(now.getMonth(), now.getFullYear());
-  };
+  }, [fetchDashboard]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -223,7 +203,7 @@ export default function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </button>
-              {!data?.isCurrentMonth && (
+              {!isCurrentMonth && (
                 <button
                   onClick={goToCurrentMonth}
                   className="ml-2 text-xs text-emerald-600 hover:text-emerald-700 font-medium"
@@ -434,7 +414,7 @@ export default function DashboardPage() {
                     className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
                   >
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg relative"
                       style={{
                         backgroundColor: transaction.categories?.color
                           ? `${transaction.categories.color}20`
@@ -442,19 +422,37 @@ export default function DashboardPage() {
                       }}
                     >
                       {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                      {/* Status indicator for recurring generated transactions */}
+                      {transaction.is_recurring_generated && (
+                        <div
+                          className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
+                            transaction.payment_status === "planned"
+                              ? "bg-amber-500"
+                              : "bg-emerald-500"
+                          }`}
+                          title={transaction.payment_status === "planned" ? "Zaplanowane" : "Opłacone"}
+                        />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-slate-900 dark:text-white truncate">
                         {transaction.merchant_name || transaction.description}
                       </p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {transaction.categories?.name || "Bez kategorii"} • {formatDate(transaction.transaction_date)}
-                      </p>
+                      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                        <span>{transaction.categories?.name || "Bez kategorii"} • {formatDate(transaction.transaction_date)}</span>
+                        {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                            Zaplanowane
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <p
                       className={`font-semibold ${
                         transaction.type === "income"
                           ? "text-emerald-600"
+                          : transaction.payment_status === "planned"
+                          ? "text-slate-400 dark:text-slate-500"
                           : "text-slate-900 dark:text-white"
                       }`}
                     >

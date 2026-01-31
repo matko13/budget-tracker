@@ -17,7 +17,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { type, amount, categoryId, date, description, merchantName, isExcluded } = body;
+    const { type, amount, categoryId, date, description, merchantName, isExcluded, paymentStatus } = body;
 
     // Verify the transaction belongs to the user
     const { data: transaction, error: fetchError } = await supabase
@@ -73,6 +73,16 @@ export async function PATCH(
     
     if (isExcluded !== undefined) {
       updateData.is_excluded = isExcluded;
+    }
+    
+    if (paymentStatus !== undefined) {
+      if (paymentStatus !== null && !["completed", "planned", "skipped"].includes(paymentStatus)) {
+        return NextResponse.json(
+          { error: "Payment status must be 'completed', 'planned', or 'skipped'" },
+          { status: 400 }
+        );
+      }
+      updateData.payment_status = paymentStatus;
     }
 
     // Update the transaction

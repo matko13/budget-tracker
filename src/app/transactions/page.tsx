@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AddTransactionModal from "@/components/AddTransactionModal";
+import { useMonth } from "@/contexts/MonthContext";
 
 interface Category {
   id: string;
@@ -44,7 +45,6 @@ interface TransactionsResponse {
 }
 
 export default function TransactionsPage() {
-  const now = new Date();
   const [data, setData] = useState<TransactionsResponse | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,14 +53,43 @@ export default function TransactionsPage() {
   const [filterType, setFilterType] = useState<string>("");
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth());
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [showAllTime, setShowAllTime] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const router = useRouter();
+
+  const {
+    selectedMonth,
+    selectedYear,
+    goToPreviousMonth: contextGoToPreviousMonth,
+    goToNextMonth: contextGoToNextMonth,
+    goToCurrentMonth: contextGoToCurrentMonth,
+    isCurrentMonth,
+    monthLabel,
+  } = useMonth();
+
+  const goToPreviousMonth = () => {
+    contextGoToPreviousMonth();
+    setPage(1);
+  };
+
+  const goToNextMonth = () => {
+    contextGoToNextMonth();
+    setPage(1);
+  };
+
+  const goToCurrentMonth = () => {
+    contextGoToCurrentMonth();
+    setShowAllTime(false);
+    setPage(1);
+  };
+
+  const toggleAllTime = () => {
+    setShowAllTime(!showAllTime);
+    setPage(1);
+  };
 
   const getMonthDateRange = (month: number, year: number) => {
     const startDate = new Date(year, month, 1).toISOString().split("T")[0];
@@ -108,46 +137,6 @@ export default function TransactionsPage() {
       setLoading(false);
     }
   }, [page, search, filterType, filterCategory, selectedMonth, selectedYear, showAllTime, router]);
-
-  const goToPreviousMonth = () => {
-    let newMonth = selectedMonth - 1;
-    let newYear = selectedYear;
-    if (newMonth < 0) {
-      newMonth = 11;
-      newYear -= 1;
-    }
-    setSelectedMonth(newMonth);
-    setSelectedYear(newYear);
-    setPage(1);
-  };
-
-  const goToNextMonth = () => {
-    let newMonth = selectedMonth + 1;
-    let newYear = selectedYear;
-    if (newMonth > 11) {
-      newMonth = 0;
-      newYear += 1;
-    }
-    setSelectedMonth(newMonth);
-    setSelectedYear(newYear);
-    setPage(1);
-  };
-
-  const goToCurrentMonth = () => {
-    const now = new Date();
-    setSelectedMonth(now.getMonth());
-    setSelectedYear(now.getFullYear());
-    setShowAllTime(false);
-    setPage(1);
-  };
-
-  const toggleAllTime = () => {
-    setShowAllTime(!showAllTime);
-    setPage(1);
-  };
-
-  const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
-  const monthLabel = new Date(selectedYear, selectedMonth).toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
 
   const fetchCategories = async () => {
     try {
@@ -250,6 +239,27 @@ export default function TransactionsPage() {
       alert("Wystąpił błąd podczas usuwania transakcji");
     } finally {
       setDeletingTransaction(null);
+    }
+  };
+
+  const handleTogglePaymentStatus = async (transactionId: string, currentStatus: string | null) => {
+    try {
+      const newStatus = currentStatus === "planned" ? "completed" : "planned";
+      const response = await fetch(`/api/transactions/${transactionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentStatus: newStatus }),
+      });
+
+      if (response.ok) {
+        fetchTransactions();
+      } else {
+        const data = await response.json();
+        alert(data.error || "Nie udało się zmienić statusu");
+      }
+    } catch (error) {
+      console.error("Error toggling payment status:", error);
+      alert("Wystąpił błąd podczas zmiany statusu");
     }
   };
 
@@ -496,6 +506,27 @@ export default function TransactionsPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Mark as Paid/Planned Toggle - only for recurring generated transactions */}
+                      {transaction.is_recurring_generated && (
+                        <button
+                          onClick={() => handleTogglePaymentStatus(transaction.id, transaction.payment_status)}
+                          title={transaction.payment_status === "planned" ? "Oznacz jako opłacone" : "Oznacz jako zaplanowane"}
+                          className={`p-1.5 rounded-lg transition-colors ${
+                            transaction.payment_status === "completed"
+                              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
+                              : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 hover:text-emerald-600 dark:hover:text-emerald-400"
+                          }`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            {transaction.payment_status === "completed" ? (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            ) : (
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            )}
+                          </svg>
+                        </button>
+                      )}
+
                       {/* Edit Button */}
                       <button
                         onClick={() => handleEditClick(transaction)}

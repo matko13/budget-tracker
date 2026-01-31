@@ -83,16 +83,19 @@ export async function GET(request: Request) {
     // Get transactions linked to recurring expenses this month
     const { data: matchedTransactions } = await supabase
       .from("transactions")
-      .select("id, recurring_expense_id, transaction_date, amount")
+      .select("id, recurring_expense_id, transaction_date, amount, payment_status, is_recurring_generated")
       .eq("user_id", user.id)
       .not("recurring_expense_id", "is", null)
       .gte("transaction_date", monthStart)
       .lte("transaction_date", monthEnd);
 
-    // Map recurring expenses with their matched status and due status
-    const matchedIds = new Set(
-      matchedTransactions?.map((t) => t.recurring_expense_id) || []
-    );
+    // Map recurring expenses to their transactions (may have multiple - generated + real)
+    const transactionsByRecurringId = new Map<string, typeof matchedTransactions>();
+    matchedTransactions?.forEach((t) => {
+      const existing = transactionsByRecurringId.get(t.recurring_expense_id) || [];
+      existing.push(t);
+      transactionsByRecurringId.set(t.recurring_expense_id, existing);
+    });
 
     // Current date for determining if due date has passed
     const now = new Date();
@@ -133,13 +136,28 @@ export async function GET(request: Request) {
       }
       // Future year - not passed
 
-      // isPaidThisMonth is true ONLY if: has linked transaction OR manually confirmed
-      // (NOT when due date has passed - that should show as overdue)
-      const hasLinkedTransaction = matchedIds.has(expense.id);
-      const isPaidThisMonth = hasLinkedTransaction || isManuallyConfirmed;
+      // Get all transactions for this recurring expense this month
+      const linkedTransactions = transactionsByRecurringId.get(expense.id) || [];
+      
+      // Check if there's a completed payment (either real bank transaction or marked as completed)
+      const hasCompletedPayment = linkedTransactions.some(
+        (t) => t.payment_status === "completed" || 
+               // Real bank transactions (not generated) are considered completed
+               (!t.is_recurring_generated && t.payment_status !== "planned")
+      );
+      
+      // hasLinkedTransaction means there's any transaction linked (for display purposes)
+      const hasLinkedTransaction = linkedTransactions.length > 0;
+      
+      // isPaidThisMonth is true if: has completed payment OR manually confirmed
+      const isPaidThisMonth = hasCompletedPayment || isManuallyConfirmed;
       
       // isOverdue is true if: due this month, due date passed, not paid, not skipped
       const isOverdue = isDueThisMonth && isDueDatePassed && !isPaidThisMonth && !isSkipped;
+
+      // Find the primary transaction to display (prefer completed/real over planned/generated)
+      const primaryTransaction = linkedTransactions.find((t) => t.payment_status === "completed" || !t.is_recurring_generated) 
+        || linkedTransactions[0];
 
       return {
         ...expense,
@@ -151,11 +169,10 @@ export async function GET(request: Request) {
         isOverdue,
         isManuallyConfirmed,
         hasLinkedTransaction,
+        hasCompletedPayment,
         effectiveAmount,
         override: override || null,
-        matchedTransaction: matchedTransactions?.find(
-          (t) => t.recurring_expense_id === expense.id
-        ),
+        matchedTransaction: primaryTransaction,
       };
     });
 

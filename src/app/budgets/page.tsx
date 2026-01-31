@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useMonth } from "@/contexts/MonthContext";
 
 interface Category {
   id: string;
@@ -32,18 +33,6 @@ interface BudgetsResponse {
   hasPreviousMonthBudgets: boolean;
 }
 
-// Helper to format month for API (YYYY-MM)
-function formatMonthForAPI(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
-}
-
-// Helper to format month for display
-function formatMonthDisplay(date: Date): string {
-  return date.toLocaleDateString("pl-PL", { month: "long", year: "numeric" });
-}
-
 export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -54,15 +43,22 @@ export default function BudgetsPage() {
   const [saving, setSaving] = useState(false);
   const [copying, setCopying] = useState(false);
   const [hasPreviousMonthBudgets, setHasPreviousMonthBudgets] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const {
+    goToPreviousMonth,
+    goToNextMonth,
+    goToCurrentMonth,
+    isCurrentMonth,
+    monthLabel,
+    monthParam,
+  } = useMonth();
+
   const fetchData = useCallback(async () => {
     try {
-      const monthParam = formatMonthForAPI(currentMonth);
       const [budgetsRes, categoriesRes] = await Promise.all([
         fetch(`/api/budgets?month=${monthParam}`),
         fetch("/api/categories"),
@@ -89,7 +85,7 @@ export default function BudgetsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, currentMonth]);
+  }, [router, monthParam]);
 
   useEffect(() => {
     setLoading(true);
@@ -109,7 +105,7 @@ export default function BudgetsPage() {
         body: JSON.stringify({
           categoryId: selectedCategory,
           amount: parseFloat(budgetAmount),
-          month: formatMonthForAPI(currentMonth),
+          month: monthParam,
         }),
       });
 
@@ -180,7 +176,7 @@ export default function BudgetsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          month: formatMonthForAPI(currentMonth),
+          month: monthParam,
         }),
       });
 
@@ -192,23 +188,6 @@ export default function BudgetsPage() {
     } finally {
       setCopying(false);
     }
-  };
-
-  const goToPreviousMonth = () => {
-    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  };
-
-  const goToNextMonth = () => {
-    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-  };
-
-  const goToCurrentMonth = () => {
-    setCurrentMonth(new Date());
-  };
-
-  const isCurrentMonth = () => {
-    const now = new Date();
-    return currentMonth.getFullYear() === now.getFullYear() && currentMonth.getMonth() === now.getMonth();
   };
 
   const formatCurrency = (amount: number) => {
@@ -283,9 +262,9 @@ export default function BudgetsPage() {
             
             <div className="text-center">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {formatMonthDisplay(currentMonth)}
+                {monthLabel}
               </h2>
-              {!isCurrentMonth() && (
+              {!isCurrentMonth && (
                 <button
                   onClick={goToCurrentMonth}
                   className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
@@ -575,7 +554,7 @@ export default function BudgetsPage() {
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-              Brak budżetów na {formatMonthDisplay(currentMonth)}
+              Brak budżetów na {monthLabel}
             </h3>
             <p className="text-slate-500 dark:text-slate-400 mb-6">
               {hasPreviousMonthBudgets 

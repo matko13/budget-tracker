@@ -87,7 +87,8 @@ export async function GET() {
 
     (transactions || [])
       .filter((t: { type: string }) => t.type === "expense")
-      .forEach((t: { transaction_date: string; amount: number; categories?: { name: string; color: string } }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .forEach((t: any) => {
         const categoryName = t.categories?.name || "Uncategorized";
         const categoryColor = t.categories?.color || "#94a3b8";
 
