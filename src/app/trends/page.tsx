@@ -130,7 +130,8 @@ export default function TrendsPage() {
                   <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 12 }} />
                   <YAxis tick={{ fill: "#64748b", fontSize: 12 }} tickFormatter={(v) => `${v / 1000}k`} />
                   <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any) => formatCurrency(value)}
                     contentStyle={{
                       backgroundColor: "#1e293b",
                       border: "none",
@@ -164,7 +165,8 @@ export default function TrendsPage() {
                   <XAxis dataKey="day" tick={{ fill: "#64748b", fontSize: 12 }} />
                   <YAxis tick={{ fill: "#64748b", fontSize: 12 }} tickFormatter={(v) => `${v}`} />
                   <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any) => formatCurrency(value)}
                     labelFormatter={(label) => `Dzień ${label}`}
                     contentStyle={{
                       backgroundColor: "#1e293b",
