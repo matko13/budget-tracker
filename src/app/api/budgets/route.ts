@@ -99,10 +99,30 @@ export async function GET(request: Request) {
       percentUsed: Math.round(((spendingByCategory[budget.category_id] || 0) / budget.amount) * 100),
     }));
 
+    // Calculate summary totals
+    const totalBudgeted = budgetsWithSpending.reduce((sum: number, b: { amount: number }) => sum + b.amount, 0);
+    const totalSpent = budgetsWithSpending.reduce((sum: number, b: { spent: number }) => sum + b.spent, 0);
+    const totalRemaining = totalBudgeted - totalSpent;
+    const overallPercentUsed = totalBudgeted > 0 ? Math.round((totalSpent / totalBudgeted) * 100) : 0;
+
+    // Calculate unbudgeted expenses (expenses in categories without a budget)
+    const budgetedCategoryIds = new Set(budgetsWithSpending.map((b: { category_id: string }) => b.category_id));
+    const unbudgetedExpenses = Object.entries(spendingByCategory)
+      .filter(([categoryId]) => !budgetedCategoryIds.has(categoryId))
+      .reduce((sum, [, amount]) => sum + amount, 0);
+
     return NextResponse.json({
       budgets: budgetsWithSpending,
       month: budgetMonth,
       hasPreviousMonthBudgets: (previousMonthBudgetCount || 0) > 0,
+      summary: {
+        totalBudgeted,
+        totalSpent,
+        totalRemaining,
+        overallPercentUsed,
+        unbudgetedExpenses,
+        budgetCount: budgetsWithSpending.length,
+      },
     });
   } catch (error) {
     console.error("Error fetching budgets:", error);

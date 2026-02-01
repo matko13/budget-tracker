@@ -25,10 +25,43 @@ interface Budget {
   percentUsed: number;
 }
 
+interface BudgetSummary {
+  totalBudgeted: number;
+  totalSpent: number;
+  totalRemaining: number;
+  overallPercentUsed: number;
+  unbudgetedExpenses: number;
+  budgetCount: number;
+}
+
+interface RecurringExpense {
+  id: string;
+  name: string;
+  amount: number;
+  isDueThisMonth: boolean;
+  isSkipped: boolean;
+  isPaidThisMonth: boolean;
+  effectiveAmount: number;
+  categories?: {
+    name: string;
+    icon: string;
+    color: string;
+  };
+}
+
+interface RecurringResponse {
+  recurringExpenses: RecurringExpense[];
+  totalDueThisMonth: number;
+  paidThisMonth: number;
+  pendingThisMonth: number;
+  overdueThisMonth: number;
+}
+
 interface BudgetsResponse {
   budgets: Budget[];
   month: string;
   hasPreviousMonthBudgets: boolean;
+  summary: BudgetSummary;
 }
 
 export default function BudgetsPage() {
@@ -44,6 +77,8 @@ export default function BudgetsPage() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<BudgetSummary | null>(null);
+  const [recurringData, setRecurringData] = useState<RecurringResponse | null>(null);
   const router = useRouter();
 
   const {
@@ -58,9 +93,10 @@ export default function BudgetsPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [budgetsRes, categoriesRes] = await Promise.all([
+      const [budgetsRes, categoriesRes, recurringRes] = await Promise.all([
         fetch(`/api/budgets?month=${monthParam}`),
         fetch("/api/categories"),
+        fetch(`/api/recurring?month=${monthParam}`),
       ]);
 
       if (budgetsRes.status === 401 || categoriesRes.status === 401) {
@@ -72,12 +108,18 @@ export default function BudgetsPage() {
         const data: BudgetsResponse = await budgetsRes.json();
         setBudgets(data.budgets);
         setHasPreviousMonthBudgets(data.hasPreviousMonthBudgets);
+        setSummary(data.summary);
       }
 
       if (categoriesRes.ok) {
         const categoriesData = await categoriesRes.json();
         // Filter to expense categories only
         setCategories(categoriesData.filter((c: Category) => c.type === "expense" || c.type === "both"));
+      }
+
+      if (recurringRes.ok) {
+        const recurringDataRes: RecurringResponse = await recurringRes.json();
+        setRecurringData(recurringDataRes);
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -284,6 +326,163 @@ export default function BudgetsPage() {
             </button>
           </div>
         </div>
+
+        {/* Budget Summary Section */}
+        {summary && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Podsumowanie budżetu</h2>
+            
+            {/* Main Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {/* Total Budgeted */}
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Zabudżetowano</span>
+                </div>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(summary.totalBudgeted)}</p>
+              </div>
+
+              {/* Total Spent */}
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Wydano</span>
+                </div>
+                <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrency(summary.totalSpent)}</p>
+              </div>
+
+              {/* Remaining */}
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-8 h-8 ${summary.totalRemaining >= 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'} rounded-lg flex items-center justify-center`}>
+                    <svg className={`w-4 h-4 ${summary.totalRemaining >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Pozostało</span>
+                </div>
+                <p className={`text-lg font-bold ${summary.totalRemaining >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {summary.totalRemaining >= 0 ? formatCurrency(summary.totalRemaining) : `-${formatCurrency(Math.abs(summary.totalRemaining))}`}
+                </p>
+              </div>
+
+              {/* Usage Percent */}
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-8 h-8 ${summary.overallPercentUsed >= 100 ? 'bg-red-100 dark:bg-red-900/30' : summary.overallPercentUsed >= 80 ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'} rounded-lg flex items-center justify-center`}>
+                    <svg className={`w-4 h-4 ${summary.overallPercentUsed >= 100 ? 'text-red-600 dark:text-red-400' : summary.overallPercentUsed >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Wykorzystanie</span>
+                </div>
+                <p className={`text-lg font-bold ${summary.overallPercentUsed >= 100 ? 'text-red-600 dark:text-red-400' : summary.overallPercentUsed >= 80 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                  {summary.overallPercentUsed}%
+                </p>
+              </div>
+            </div>
+
+            {/* Overall Progress Bar */}
+            <div className="mb-6">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-slate-600 dark:text-slate-400">Ogólny postęp</span>
+                <span className="text-slate-600 dark:text-slate-400">{summary.budgetCount} budżetów</span>
+              </div>
+              <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    summary.overallPercentUsed >= 100
+                      ? "bg-red-500"
+                      : summary.overallPercentUsed >= 80
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(summary.overallPercentUsed, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Expected Expenses Section */}
+            {recurringData && recurringData.totalDueThisMonth > 0 && (
+              <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Oczekiwane wydatki cykliczne</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* Expected Total */}
+                  <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3">
+                    <span className="text-xs text-purple-600 dark:text-purple-400 block mb-1">Oczekiwane</span>
+                    <p className="text-sm font-bold text-purple-700 dark:text-purple-300">{formatCurrency(recurringData.totalDueThisMonth)}</p>
+                  </div>
+                  
+                  {/* Paid */}
+                  <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-3">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 block mb-1">Zapłacone</span>
+                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(recurringData.paidThisMonth)}</p>
+                  </div>
+                  
+                  {/* Pending */}
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+                    <span className="text-xs text-amber-600 dark:text-amber-400 block mb-1">Oczekujące</span>
+                    <p className="text-sm font-bold text-amber-700 dark:text-amber-300">{formatCurrency(recurringData.pendingThisMonth)}</p>
+                  </div>
+                  
+                  {/* Overdue */}
+                  {recurringData.overdueThisMonth > 0 && (
+                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
+                      <span className="text-xs text-red-600 dark:text-red-400 block mb-1">Zaległe</span>
+                      <p className="text-sm font-bold text-red-700 dark:text-red-300">{formatCurrency(recurringData.overdueThisMonth)}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Expected vs Budget Comparison */}
+                {summary.totalBudgeted > 0 && (
+                  <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600 dark:text-slate-400">
+                        Wydatki cykliczne vs Budżet
+                      </span>
+                      <span className={`text-sm font-medium ${
+                        recurringData.totalDueThisMonth > summary.totalBudgeted 
+                          ? 'text-amber-600 dark:text-amber-400' 
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}>
+                        {Math.round((recurringData.totalDueThisMonth / summary.totalBudgeted) * 100)}% budżetu
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Unbudgeted Expenses Warning */}
+            {summary.unbudgetedExpenses > 0 && (
+              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="flex-1">
+                    <span className="text-sm text-amber-800 dark:text-amber-200">
+                      Wydatki bez budżetu: <strong>{formatCurrency(summary.unbudgetedExpenses)}</strong>
+                    </span>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                      Rozważ dodanie budżetów dla pozostałych kategorii
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Header with Add Budget button */}
         <div className="flex items-center justify-between mb-6">
