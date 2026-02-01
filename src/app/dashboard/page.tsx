@@ -46,6 +46,15 @@ interface Budget {
   percentUsed: number;
 }
 
+interface BudgetSummary {
+  totalBudgeted: number;
+  totalSpent: number;
+  totalRemaining: number;
+  percentUsed: number;
+  budgetCount: number;
+  expectedRecurring: number;
+}
+
 interface DashboardData {
   accounts: Account[];
   monthlyBalance: number;
@@ -55,6 +64,7 @@ interface DashboardData {
   categoryBreakdown: Array<{ name: string; amount: number; color: string }>;
   recentTransactions: Transaction[];
   budgets: Budget[];
+  budgetSummary: BudgetSummary;
   currentMonth: string;
   month: number;
   year: number;
@@ -295,7 +305,7 @@ export default function DashboardPage() {
         )}
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
@@ -356,6 +366,97 @@ export default function DashboardPage() {
             <p className="text-sm text-slate-500 dark:text-slate-500 mt-1">Ten miesiąc</p>
           </div>
         </div>
+
+        {/* Budget Summary Card */}
+        {data?.budgetSummary && data.budgetSummary.budgetCount > 0 && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                  data.budgetSummary.percentUsed >= 100
+                    ? "bg-red-100 dark:bg-red-900/30"
+                    : data.budgetSummary.percentUsed >= 80
+                    ? "bg-amber-100 dark:bg-amber-900/30"
+                    : "bg-purple-100 dark:bg-purple-900/30"
+                }`}>
+                  <svg className={`w-6 h-6 ${
+                    data.budgetSummary.percentUsed >= 100
+                      ? "text-red-600"
+                      : data.budgetSummary.percentUsed >= 80
+                      ? "text-amber-600"
+                      : "text-purple-600"
+                  }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <span className="text-slate-600 dark:text-slate-400">Wykorzystanie budżetu</span>
+                  <p className="text-xs text-slate-500 dark:text-slate-500">{data.budgetSummary.budgetCount} budżetów</p>
+                </div>
+              </div>
+              <Link
+                href={getMonthUrl("/budgets")}
+                className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+              >
+                Szczegóły
+              </Link>
+            </div>
+
+            {/* Budget Progress Bar */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-slate-600 dark:text-slate-400">
+                  {formatCurrency(data.budgetSummary.totalSpent)} z {formatCurrency(data.budgetSummary.totalBudgeted)}
+                </span>
+                <span className={`font-medium ${
+                  data.budgetSummary.percentUsed >= 100
+                    ? "text-red-600"
+                    : data.budgetSummary.percentUsed >= 80
+                    ? "text-amber-600"
+                    : "text-emerald-600"
+                }`}>
+                  {data.budgetSummary.percentUsed}%
+                </span>
+              </div>
+              <div className="h-3 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    data.budgetSummary.percentUsed >= 100
+                      ? "bg-red-500"
+                      : data.budgetSummary.percentUsed >= 80
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${Math.min(data.budgetSummary.percentUsed, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Budget Details Row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Zabudżetowano</span>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(data.budgetSummary.totalBudgeted)}</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Wydano</span>
+                <p className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(data.budgetSummary.totalSpent)}</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-3">
+                <span className="text-xs text-slate-500 dark:text-slate-400 block mb-1">Pozostało</span>
+                <p className={`text-sm font-bold ${data.budgetSummary.totalRemaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {data.budgetSummary.totalRemaining >= 0 ? formatCurrency(data.budgetSummary.totalRemaining) : `-${formatCurrency(Math.abs(data.budgetSummary.totalRemaining))}`}
+                </p>
+              </div>
+              {data.budgetSummary.expectedRecurring > 0 && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-3">
+                  <span className="text-xs text-purple-600 dark:text-purple-400 block mb-1">Oczekiwane cykliczne</span>
+                  <p className="text-sm font-bold text-purple-700 dark:text-purple-300">{formatCurrency(data.budgetSummary.expectedRecurring)}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Spending by Category */}

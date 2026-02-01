@@ -109,12 +109,59 @@ export async function GET(request: Request) {
       percentUsed: Math.round(((spendingByCategoryId[budget.category_id] || 0) / budget.amount) * 100),
     }));
 
+    // Calculate budget summary
+    const totalBudgeted = budgetsWithSpending.reduce((sum: number, b: { budgetAmount: number }) => sum + b.budgetAmount, 0);
+    const totalBudgetSpent = budgetsWithSpending.reduce((sum: number, b: { spent: number }) => sum + b.spent, 0);
+    const totalBudgetRemaining = totalBudgeted - totalBudgetSpent;
+    const budgetPercentUsed = totalBudgeted > 0 ? Math.round((totalBudgetSpent / totalBudgeted) * 100) : 0;
+
     const selectedDate = new Date(year, month);
     const isCurrentMonth = month === now.getMonth() && year === now.getFullYear();
 
     // Calculate monthly balance and savings rate
     const monthlyBalance = monthlyIncome - monthlyExpenses;
     const savingsRate = monthlyIncome > 0 ? Math.round((monthlyBalance / monthlyIncome) * 100) : 0;
+
+    // Get recurring expenses data for expected expenses
+    const { data: recurringExpenses } = await supabase
+      .from("recurring_expenses")
+      .select("*, categories(*)")
+      .eq("user_id", user.id)
+      .eq("is_active", true);
+
+    // Helper to check if expense is due this month
+    const isExpenseDueInMonth = (expense: { interval_months: number; start_date: string }) => {
+      const targetMonthNum = year * 12 + month;
+      const startDate = new Date(expense.start_date);
+      const startMonth = startDate.getFullYear() * 12 + startDate.getMonth();
+      const monthsSinceStart = targetMonthNum - startMonth;
+      return monthsSinceStart >= 0 && monthsSinceStart % expense.interval_months === 0;
+    };
+
+    // Get overrides for this month
+    const monthKey = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const { data: overrides } = await supabase
+      .from("recurring_expense_overrides")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("override_month", monthKey);
+
+    const overridesMap = new Map(
+      overrides?.map((o: { recurring_expense_id: string; is_skipped: boolean; override_amount: number | null }) => [o.recurring_expense_id, o]) || []
+    );
+
+    // Calculate expected recurring expenses
+    const expectedRecurring = (recurringExpenses || [])
+      .filter((e: { id: string; interval_months: number; start_date: string }) => {
+        if (!isExpenseDueInMonth(e)) return false;
+        const override = overridesMap.get(e.id);
+        return !override?.is_skipped;
+      })
+      .reduce((sum: number, e: { id: string; amount: number }) => {
+        const override = overridesMap.get(e.id);
+        const amount = override?.override_amount ?? e.amount;
+        return sum + parseFloat(String(amount));
+      }, 0);
 
     return NextResponse.json({
       accounts: accounts || [],
@@ -125,6 +172,14 @@ export async function GET(request: Request) {
       categoryBreakdown,
       recentTransactions,
       budgets: budgetsWithSpending,
+      budgetSummary: {
+        totalBudgeted,
+        totalSpent: totalBudgetSpent,
+        totalRemaining: totalBudgetRemaining,
+        percentUsed: budgetPercentUsed,
+        budgetCount: budgetsWithSpending.length,
+        expectedRecurring,
+      },
       currentMonth: selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
       month,
       year,
