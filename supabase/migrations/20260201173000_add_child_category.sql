@@ -10,9 +10,8 @@ ON CONFLICT DO NOTHING;
 INSERT INTO categorization_rules (category_id, keyword, is_system)
 SELECT c.id, k.keyword, true
 FROM categories c
-CROSS JOIN (
+JOIN (
     VALUES 
-        -- Child-related keywords
         ('Dzieci', 'przedszkole'),
         ('Dzieci', 'żłobek'),
         ('Dzieci', 'zlobek'),
