@@ -458,137 +458,56 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Spending by Category */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Wydatki według kategorii
-              </h2>
-              <Link
-                href={getMonthUrl("/trends")}
-                className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
-              >
-                Zobacz trendy
-              </Link>
-            </div>
-            
-            {data?.categoryBreakdown && data.categoryBreakdown.length > 0 ? (
-              <div className="space-y-4">
-                {data.categoryBreakdown.map((category) => (
-                  <div key={category.name}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                        {category.name}
-                      </span>
-                      <span className="text-sm text-slate-600 dark:text-slate-400">
-                        {formatCurrency(category.amount)}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${(category.amount / maxCategoryAmount) * 100}%`,
-                          backgroundColor: category.color,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-slate-500 dark:text-slate-400">
-                  Brak danych o wydatkach
-                </p>
-              </div>
-            )}
+        {/* Spending by Category */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Wydatki według kategorii
+            </h2>
+            <Link
+              href={getMonthUrl("/trends")}
+              className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+            >
+              Zobacz trendy
+            </Link>
           </div>
-
-          {/* Recent Transactions */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                Ostatnie transakcje
-              </h2>
-              <Link
-                href={getMonthUrl("/transactions")}
-                className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
-              >
-                Zobacz wszystkie
-              </Link>
-            </div>
-            
-            {data?.recentTransactions && data.recentTransactions.length > 0 ? (
-              <div className="space-y-3">
-                {data.recentTransactions.map((transaction) => (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                  >
+          
+          {data?.categoryBreakdown && data.categoryBreakdown.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {data.categoryBreakdown.map((category) => (
+                <div key={category.name}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {category.name}
+                    </span>
+                    <span className="text-sm text-slate-600 dark:text-slate-400">
+                      {formatCurrency(category.amount)}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg relative"
+                      className="h-full rounded-full transition-all"
                       style={{
-                        backgroundColor: transaction.categories?.color
-                          ? `${transaction.categories.color}20`
-                          : "#f1f5f9",
+                        width: `${(category.amount / maxCategoryAmount) * 100}%`,
+                        backgroundColor: category.color,
                       }}
-                    >
-                      {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
-                      {/* Status indicator for recurring generated transactions */}
-                      {transaction.is_recurring_generated && (
-                        <div
-                          className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
-                            transaction.payment_status === "planned"
-                              ? "bg-amber-500"
-                              : "bg-emerald-500"
-                          }`}
-                          title={transaction.payment_status === "planned" ? "Zaplanowane" : "Opłacone"}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-900 dark:text-white truncate">
-                        {transaction.merchant_name || transaction.description}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-                        <span>{transaction.categories?.name || "Bez kategorii"} • {formatDate(transaction.transaction_date)}</span>
-                        {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
-                            Zaplanowane
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <p
-                      className={`font-semibold ${
-                        transaction.type === "income"
-                          ? "text-emerald-600"
-                          : transaction.payment_status === "planned"
-                          ? "text-slate-400 dark:text-slate-500"
-                          : "text-slate-900 dark:text-white"
-                      }`}
-                    >
-                      {transaction.type === "income" ? "+" : "-"}
-                      {formatCurrency(transaction.amount, transaction.currency)}
-                    </p>
+                    />
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-slate-500 dark:text-slate-400">
-                  Brak transakcji
-                </p>
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-slate-500 dark:text-slate-400">
+                Brak danych o wydatkach
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Budget Progress */}
         {data?.budgets && data.budgets.length > 0 && (
-          <div className="mt-8">
+          <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-900 dark:text-white">
                 Postęp budżetu
@@ -648,6 +567,85 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {/* Recent Transactions - at the bottom */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+              Ostatnie transakcje
+            </h2>
+            <Link
+              href={getMonthUrl("/transactions")}
+              className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+            >
+              Zobacz wszystkie
+            </Link>
+          </div>
+          
+          {data?.recentTransactions && data.recentTransactions.length > 0 ? (
+            <div className="space-y-3">
+              {data.recentTransactions.map((transaction) => (
+                <div
+                  key={transaction.id}
+                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-lg relative"
+                    style={{
+                      backgroundColor: transaction.categories?.color
+                        ? `${transaction.categories.color}20`
+                        : "#f1f5f9",
+                    }}
+                  >
+                    {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                    {/* Status indicator for recurring generated transactions */}
+                    {transaction.is_recurring_generated && (
+                      <div
+                        className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
+                          transaction.payment_status === "planned"
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
+                        }`}
+                        title={transaction.payment_status === "planned" ? "Zaplanowane" : "Opłacone"}
+                      />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 dark:text-white truncate">
+                      {transaction.merchant_name || transaction.description}
+                    </p>
+                    <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                      <span>{transaction.categories?.name || "Bez kategorii"} • {formatDate(transaction.transaction_date)}</span>
+                      {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                          Zaplanowane
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p
+                    className={`font-semibold ${
+                      transaction.type === "income"
+                        ? "text-emerald-600"
+                        : transaction.payment_status === "planned"
+                        ? "text-slate-400 dark:text-slate-500"
+                        : "text-slate-900 dark:text-white"
+                    }`}
+                  >
+                    {transaction.type === "income" ? "+" : "-"}
+                    {formatCurrency(transaction.amount, transaction.currency)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-slate-500 dark:text-slate-400">
+                Brak transakcji
+              </p>
+            </div>
+          )}
+        </div>
 
       </main>
 
