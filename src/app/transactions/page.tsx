@@ -50,6 +50,7 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<string>("");
   const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [showAllTime, setShowAllTime] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -107,6 +108,7 @@ export default function TransactionsPage() {
       if (search) params.append("search", search);
       if (filterType) params.append("type", filterType);
       if (filterCategory) params.append("category", filterCategory);
+      if (filterStatus) params.append("status", filterStatus);
       
       // Add date filters if not showing all time
       if (!showAllTime) {
@@ -135,7 +137,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterType, filterCategory, selectedMonth, selectedYear, showAllTime, router]);
+  }, [page, search, filterType, filterCategory, filterStatus, selectedMonth, selectedYear, showAllTime, router]);
 
   const fetchCategories = async () => {
     try {
@@ -369,7 +371,7 @@ export default function TransactionsPage() {
 
         {/* Filters */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Szukaj
@@ -426,21 +428,74 @@ export default function TransactionsPage() {
               </select>
             </div>
 
-            <div className="flex items-end">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="">Wszystkie statusy</option>
+                <option value="actual">💵 Rzeczywiste</option>
+                <option value="planned">📅 Zaplanowane</option>
+                <option value="completed">✅ Cykliczne opłacone</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="mt-4 flex items-center justify-end gap-4">
               <button
                 onClick={() => {
                   setSearch("");
                   setFilterType("");
                   setFilterCategory("");
+                  setFilterStatus("");
                   setPage(1);
                 }}
-                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
               >
                 Wyczyść filtry
               </button>
             </div>
-          </div>
         </div>
+
+        {/* Summary */}
+        {data?.transactions && data.transactions.length > 0 && !loading && (
+          <div className="flex flex-wrap gap-3 mb-4">
+            {(() => {
+              const actualCount = data.transactions.filter(t => !t.is_recurring_generated).length;
+              const plannedCount = data.transactions.filter(t => t.is_recurring_generated && t.payment_status === "planned").length;
+              const recurringCompletedCount = data.transactions.filter(t => t.is_recurring_generated && t.payment_status === "completed").length;
+              return (
+                <>
+                  {actualCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm">
+                      <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                      <span className="text-slate-600 dark:text-slate-400">Rzeczywiste: <strong className="text-slate-900 dark:text-white">{actualCount}</strong></span>
+                    </div>
+                  )}
+                  {plannedCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span className="text-amber-700 dark:text-amber-400">Zaplanowane: <strong>{plannedCount}</strong></span>
+                    </div>
+                  )}
+                  {recurringCompletedCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span className="text-emerald-700 dark:text-emerald-400">Cykliczne opłacone: <strong>{recurringCompletedCount}</strong></span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Transactions List */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm overflow-hidden">
@@ -455,12 +510,12 @@ export default function TransactionsPage() {
                 {data.transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                    className={`p-4 transition-colors ${
                       transaction.is_excluded ? "opacity-60" : ""
                     } ${
                       transaction.is_recurring_generated && transaction.payment_status === "planned"
-                        ? "bg-amber-50/50 dark:bg-amber-900/10"
-                        : ""
+                        ? "bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-amber-400 dark:border-l-amber-500"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-700/50"
                     }`}
                   >
                     {/* Mobile Layout */}
@@ -468,17 +523,29 @@ export default function TransactionsPage() {
                       {/* Row 1: Icon + Name + Amount */}
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 relative ${
+                            transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "border-2 border-dashed border-amber-400 dark:border-amber-500"
+                              : ""
+                          }`}
                           style={{
-                            backgroundColor: transaction.categories?.color
+                            backgroundColor: transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "#fef3c7"
+                              : transaction.categories?.color
                               ? `${transaction.categories.color}20`
                               : "#f1f5f9",
                           }}
                         >
-                          {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                          {transaction.is_recurring_generated && transaction.payment_status === "planned" 
+                            ? "📅" 
+                            : transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-white truncate text-sm">
+                          <p className={`font-medium truncate text-sm ${
+                            transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "text-amber-800 dark:text-amber-300"
+                              : "text-slate-900 dark:text-white"
+                          }`}>
                             {transaction.merchant_name || transaction.description}
                           </p>
                         </div>
@@ -528,15 +595,26 @@ export default function TransactionsPage() {
                       
                       {/* Row 3: Badges + Actions */}
                       <div className="flex items-center justify-between pl-[52px]">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200 font-medium flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               Zaplanowane
                             </span>
                           )}
                           {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
                               Cykliczny
+                            </span>
+                          )}
+                          {!transaction.is_recurring_generated && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                              Rzeczywista
                             </span>
                           )}
                           {transaction.is_excluded && (
@@ -600,29 +678,52 @@ export default function TransactionsPage() {
                     {/* Desktop Layout */}
                     <div className="hidden md:flex items-center gap-4">
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
+                          transaction.is_recurring_generated && transaction.payment_status === "planned"
+                            ? "border-2 border-dashed border-amber-400 dark:border-amber-500"
+                            : ""
+                        }`}
                         style={{
-                          backgroundColor: transaction.categories?.color
+                          backgroundColor: transaction.is_recurring_generated && transaction.payment_status === "planned"
+                            ? "#fef3c7"
+                            : transaction.categories?.color
                             ? `${transaction.categories.color}20`
                             : "#f1f5f9",
                         }}
                       >
-                        {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                        {transaction.is_recurring_generated && transaction.payment_status === "planned" 
+                          ? "📅" 
+                          : transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900 dark:text-white truncate">
+                          <p className={`font-medium truncate ${
+                            transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "text-amber-800 dark:text-amber-300"
+                              : "text-slate-900 dark:text-white"
+                          }`}>
                             {transaction.merchant_name || transaction.description}
                           </p>
                           {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex-shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200 font-medium flex-shrink-0 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               Zaplanowane
                             </span>
                           )}
                           {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex-shrink-0 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
                               Cykliczny
+                            </span>
+                          )}
+                          {!transaction.is_recurring_generated && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 flex-shrink-0">
+                              Rzeczywista
                             </span>
                           )}
                           {transaction.is_excluded && (
@@ -635,6 +736,9 @@ export default function TransactionsPage() {
                           {transaction.description}
                         </p>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
+                            <span className="text-amber-600 dark:text-amber-400">Planowana płatność • </span>
+                          )}
                           {formatDate(transaction.transaction_date)}
                           {transaction.accounts?.name && ` • ${transaction.accounts.name}`}
                         </p>
