@@ -22,6 +22,8 @@ export async function GET(request: Request) {
     const search = searchParams.get("search");
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
+    const status = searchParams.get("status"); // actual, planned, completed
+    const hidePlanned = searchParams.get("hidePlanned") === "true";
 
     // Auto-generate recurring transactions for the requested month range
     if (startDate) {
@@ -66,6 +68,24 @@ export async function GET(request: Request) {
     }
     if (endDate) {
       query = query.lte("transaction_date", endDate);
+    }
+    
+    // Filter by status
+    if (status === "actual") {
+      // Actual transactions - not recurring generated
+      query = query.eq("is_recurring_generated", false);
+    } else if (status === "planned") {
+      // Planned recurring transactions
+      query = query.eq("is_recurring_generated", true).eq("payment_status", "planned");
+    } else if (status === "completed") {
+      // Completed recurring transactions
+      query = query.eq("is_recurring_generated", true).eq("payment_status", "completed");
+    }
+    
+    // Hide planned recurring transactions
+    if (hidePlanned) {
+      // Show all except planned recurring transactions
+      query = query.or("is_recurring_generated.eq.false,payment_status.neq.planned");
     }
 
     const { data: transactions, count, error } = await query;

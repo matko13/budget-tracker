@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import AddTransactionModal from "@/components/AddTransactionModal";
 import { useMonth } from "@/contexts/MonthContext";
@@ -43,20 +43,61 @@ interface TransactionsResponse {
 }
 
 export default function TransactionsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  
   const [data, setData] = useState<TransactionsResponse | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<string>("");
-  const [filterCategory, setFilterCategory] = useState<string>("");
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
-  const [showAllTime, setShowAllTime] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-  const router = useRouter();
+
+  // Read filters from URL params
+  const page = parseInt(searchParams.get("page") || "1");
+  const search = searchParams.get("search") || "";
+  const filterType = searchParams.get("type") || "";
+  const filterCategory = searchParams.get("category") || "";
+  const filterStatus = searchParams.get("status") || "";
+  const hidePlanned = searchParams.get("hidePlanned") === "true";
+  const showAllTime = searchParams.get("allTime") === "true";
+
+  // Update URL with new params
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === "" || value === "false") {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    
+    // Always reset to page 1 when filters change (unless page is being set directly)
+    if (!("page" in updates) && Object.keys(updates).some(k => k !== "page")) {
+      params.delete("page");
+    }
+    
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  // Helper functions for filter updates
+  const setPage = (newPage: number | ((p: number) => number)) => {
+    const value = typeof newPage === "function" ? newPage(page) : newPage;
+    updateUrlParams({ page: value > 1 ? value.toString() : null });
+  };
+  
+  const setSearch = (value: string) => updateUrlParams({ search: value || null, page: null });
+  const setFilterType = (value: string) => updateUrlParams({ type: value || null, page: null });
+  const setFilterCategory = (value: string) => updateUrlParams({ category: value || null, page: null });
+  const setFilterStatus = (value: string) => updateUrlParams({ status: value || null, page: null });
+  const setHidePlanned = (value: boolean) => updateUrlParams({ hidePlanned: value ? "true" : null, page: null });
+  const setShowAllTime = (value: boolean) => updateUrlParams({ allTime: value ? "true" : null, page: null });
 
   const {
     selectedMonth,
@@ -71,23 +112,21 @@ export default function TransactionsPage() {
 
   const goToPreviousMonth = () => {
     contextGoToPreviousMonth();
-    setPage(1);
+    updateUrlParams({ page: null });
   };
 
   const goToNextMonth = () => {
     contextGoToNextMonth();
-    setPage(1);
+    updateUrlParams({ page: null });
   };
 
   const goToCurrentMonth = () => {
     contextGoToCurrentMonth();
     setShowAllTime(false);
-    setPage(1);
   };
 
   const toggleAllTime = () => {
     setShowAllTime(!showAllTime);
-    setPage(1);
   };
 
   const getMonthDateRange = (month: number, year: number) => {
@@ -107,6 +146,8 @@ export default function TransactionsPage() {
       if (search) params.append("search", search);
       if (filterType) params.append("type", filterType);
       if (filterCategory) params.append("category", filterCategory);
+      if (filterStatus) params.append("status", filterStatus);
+      if (hidePlanned) params.append("hidePlanned", "true");
       
       // Add date filters if not showing all time
       if (!showAllTime) {
@@ -135,7 +176,7 @@ export default function TransactionsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, filterType, filterCategory, selectedMonth, selectedYear, showAllTime, router]);
+  }, [page, search, filterType, filterCategory, filterStatus, hidePlanned, selectedMonth, selectedYear, showAllTime, router]);
 
   const fetchCategories = async () => {
     try {
@@ -369,7 +410,7 @@ export default function TransactionsPage() {
 
         {/* Filters */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Szukaj
@@ -426,21 +467,95 @@ export default function TransactionsPage() {
               </select>
             </div>
 
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  setSearch("");
-                  setFilterType("");
-                  setFilterCategory("");
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Status
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => {
+                  setFilterStatus(e.target.value);
                   setPage(1);
                 }}
-                className="w-full px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              >
+                <option value="">Wszystkie statusy</option>
+                <option value="actual">💵 Rzeczywiste</option>
+                <option value="planned">📅 Zaplanowane</option>
+                <option value="completed">✅ Cykliczne opłacone</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="mt-4 flex items-center justify-between gap-4">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={hidePlanned}
+                    onChange={(e) => setHidePlanned(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-amber-500 transition-colors"></div>
+                  <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform"></div>
+                </div>
+                <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                  Ukryj zaplanowane cykliczne
+                </span>
+              </label>
+              <button
+                onClick={() => {
+                  updateUrlParams({
+                    search: null,
+                    type: null,
+                    category: null,
+                    status: null,
+                    hidePlanned: null,
+                    page: null,
+                  });
+                }}
+                className="px-4 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded-lg transition-colors"
               >
                 Wyczyść filtry
               </button>
             </div>
-          </div>
         </div>
+
+        {/* Summary */}
+        {data?.transactions && data.transactions.length > 0 && !loading && (
+          <div className="flex flex-wrap gap-3 mb-4">
+            {(() => {
+              const actualCount = data.transactions.filter(t => !t.is_recurring_generated).length;
+              const plannedCount = data.transactions.filter(t => t.is_recurring_generated && t.payment_status === "planned").length;
+              const recurringCompletedCount = data.transactions.filter(t => t.is_recurring_generated && t.payment_status === "completed").length;
+              return (
+                <>
+                  {actualCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm">
+                      <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                      <span className="text-slate-600 dark:text-slate-400">Rzeczywiste: <strong className="text-slate-900 dark:text-white">{actualCount}</strong></span>
+                    </div>
+                  )}
+                  {plannedCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      <span className="text-amber-700 dark:text-amber-400">Zaplanowane: <strong>{plannedCount}</strong></span>
+                    </div>
+                  )}
+                  {recurringCompletedCount > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-sm">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      <span className="text-emerald-700 dark:text-emerald-400">Cykliczne opłacone: <strong>{recurringCompletedCount}</strong></span>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Transactions List */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm overflow-hidden">
@@ -455,12 +570,12 @@ export default function TransactionsPage() {
                 {data.transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className={`p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
+                    className={`p-4 transition-colors ${
                       transaction.is_excluded ? "opacity-60" : ""
                     } ${
                       transaction.is_recurring_generated && transaction.payment_status === "planned"
-                        ? "bg-amber-50/50 dark:bg-amber-900/10"
-                        : ""
+                        ? "bg-amber-50 dark:bg-amber-900/20 border-l-4 border-l-amber-400 dark:border-l-amber-500"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-700/50"
                     }`}
                   >
                     {/* Mobile Layout */}
@@ -468,17 +583,29 @@ export default function TransactionsPage() {
                       {/* Row 1: Icon + Name + Amount */}
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0"
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg shrink-0 relative ${
+                            transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "border-2 border-dashed border-amber-400 dark:border-amber-500"
+                              : ""
+                          }`}
                           style={{
-                            backgroundColor: transaction.categories?.color
+                            backgroundColor: transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "#fef3c7"
+                              : transaction.categories?.color
                               ? `${transaction.categories.color}20`
                               : "#f1f5f9",
                           }}
                         >
-                          {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                          {transaction.is_recurring_generated && transaction.payment_status === "planned" 
+                            ? "📅" 
+                            : transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-white truncate text-sm">
+                          <p className={`font-medium truncate text-sm ${
+                            transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "text-amber-800 dark:text-amber-300"
+                              : "text-slate-900 dark:text-white"
+                          }`}>
                             {transaction.merchant_name || transaction.description}
                           </p>
                         </div>
@@ -528,15 +655,26 @@ export default function TransactionsPage() {
                       
                       {/* Row 3: Badges + Actions */}
                       <div className="flex items-center justify-between pl-[52px]">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200 font-medium flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               Zaplanowane
                             </span>
                           )}
                           {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
                               Cykliczny
+                            </span>
+                          )}
+                          {!transaction.is_recurring_generated && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                              Rzeczywista
                             </span>
                           )}
                           {transaction.is_excluded && (
@@ -600,29 +738,52 @@ export default function TransactionsPage() {
                     {/* Desktop Layout */}
                     <div className="hidden md:flex items-center gap-4">
                       <div
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
+                          transaction.is_recurring_generated && transaction.payment_status === "planned"
+                            ? "border-2 border-dashed border-amber-400 dark:border-amber-500"
+                            : ""
+                        }`}
                         style={{
-                          backgroundColor: transaction.categories?.color
+                          backgroundColor: transaction.is_recurring_generated && transaction.payment_status === "planned"
+                            ? "#fef3c7"
+                            : transaction.categories?.color
                             ? `${transaction.categories.color}20`
                             : "#f1f5f9",
                         }}
                       >
-                        {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
+                        {transaction.is_recurring_generated && transaction.payment_status === "planned" 
+                          ? "📅" 
+                          : transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900 dark:text-white truncate">
+                          <p className={`font-medium truncate ${
+                            transaction.is_recurring_generated && transaction.payment_status === "planned"
+                              ? "text-amber-800 dark:text-amber-300"
+                              : "text-slate-900 dark:text-white"
+                          }`}>
                             {transaction.merchant_name || transaction.description}
                           </p>
                           {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 flex-shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200 font-medium flex-shrink-0 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
                               Zaplanowane
                             </span>
                           )}
                           {transaction.is_recurring_generated && transaction.payment_status === "completed" && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex-shrink-0">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 flex-shrink-0 flex items-center gap-1">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
                               Cykliczny
+                            </span>
+                          )}
+                          {!transaction.is_recurring_generated && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 flex-shrink-0">
+                              Rzeczywista
                             </span>
                           )}
                           {transaction.is_excluded && (
@@ -635,6 +796,9 @@ export default function TransactionsPage() {
                           {transaction.description}
                         </p>
                         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                          {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
+                            <span className="text-amber-600 dark:text-amber-400">Planowana płatność • </span>
+                          )}
                           {formatDate(transaction.transaction_date)}
                           {transaction.accounts?.name && ` • ${transaction.accounts.name}`}
                         </p>
@@ -776,7 +940,7 @@ export default function TransactionsPage() {
                 Nie znaleziono transakcji
               </h3>
               <p className="text-slate-500 dark:text-slate-400">
-                {search || filterType || filterCategory
+                {search || filterType || filterCategory || filterStatus || hidePlanned
                   ? "Spróbuj zmienić filtry"
                   : "Zaimportuj transakcje z pliku CSV lub dodaj ręcznie"}
               </p>
