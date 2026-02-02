@@ -76,8 +76,24 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [user, setUser] = useState<{ email: string } | null>(null);
+  const [hidePlanned, setHidePlanned] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // Load hidePlanned preference from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem("hidePlanned");
+    if (stored === "true") {
+      setHidePlanned(true);
+    }
+  }, []);
+
+  // Save hidePlanned preference to localStorage
+  const toggleHidePlanned = () => {
+    const newValue = !hidePlanned;
+    setHidePlanned(newValue);
+    localStorage.setItem("hidePlanned", newValue ? "true" : "false");
+  };
   
   const {
     selectedMonth,
@@ -91,7 +107,14 @@ export default function DashboardPage() {
 
   const fetchDashboard = useCallback(async () => {
     try {
-      const response = await fetch(`/api/dashboard?month=${selectedMonth}&year=${selectedYear}`);
+      const params = new URLSearchParams({
+        month: selectedMonth.toString(),
+        year: selectedYear.toString(),
+      });
+      if (hidePlanned) {
+        params.append("hidePlanned", "true");
+      }
+      const response = await fetch(`/api/dashboard?${params}`);
       if (!response.ok) {
         if (response.status === 401) {
           router.push("/login");
@@ -106,7 +129,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, selectedMonth, selectedYear]);
+  }, [router, selectedMonth, selectedYear, hidePlanned]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -574,12 +597,29 @@ export default function DashboardPage() {
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               Ostatnie transakcje
             </h2>
-            <Link
-              href={getMonthUrl("/transactions")}
-              className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
-            >
-              Zobacz wszystkie
-            </Link>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={hidePlanned}
+                    onChange={toggleHidePlanned}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-amber-500 transition-colors"></div>
+                  <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow peer-checked:translate-x-4 transition-transform"></div>
+                </div>
+                <span className="text-xs text-slate-600 dark:text-slate-400">
+                  Ukryj zaplanowane
+                </span>
+              </label>
+              <Link
+                href={`${getMonthUrl("/transactions")}${hidePlanned ? "?hidePlanned=true" : ""}`}
+                className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
+              >
+                Zobacz wszystkie
+              </Link>
+            </div>
           </div>
           
           {data?.recentTransactions && data.recentTransactions.length > 0 ? (

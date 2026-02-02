@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     const now = new Date();
     const month = parseInt(searchParams.get("month") || String(now.getMonth()));
     const year = parseInt(searchParams.get("year") || String(now.getFullYear()));
+    const hidePlanned = searchParams.get("hidePlanned") === "true";
 
     // Auto-generate recurring transactions for this month
     await ensureRecurringTransactions(supabase, user.id, year, month);
@@ -77,8 +78,15 @@ export async function GET(request: Request) {
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 8);
 
-    // Get recent transactions
-    const recentTransactions = transactions?.slice(0, 10) || [];
+    // Get recent transactions (optionally filter out planned recurring)
+    let recentTransactions = transactions || [];
+    if (hidePlanned) {
+      recentTransactions = recentTransactions.filter(
+        (t: { is_recurring_generated: boolean; payment_status: string | null }) => 
+          !t.is_recurring_generated || t.payment_status !== "planned"
+      );
+    }
+    recentTransactions = recentTransactions.slice(0, 10);
 
     // Get budgets with spending for the selected month
     const budgetMonth = new Date(year, month, 1).toISOString().split("T")[0];

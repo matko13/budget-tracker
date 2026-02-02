@@ -96,8 +96,28 @@ function TransactionsContent() {
   const setFilterType = (value: string) => updateUrlParams({ type: value || null, page: null });
   const setFilterCategory = (value: string) => updateUrlParams({ category: value || null, page: null });
   const setFilterStatus = (value: string) => updateUrlParams({ status: value || null, page: null });
-  const setHidePlanned = (value: boolean) => updateUrlParams({ hidePlanned: value ? "true" : null, page: null });
+  const setHidePlanned = (value: boolean) => {
+    // Sync to localStorage for cross-page persistence
+    localStorage.setItem("hidePlanned", value ? "true" : "false");
+    updateUrlParams({ hidePlanned: value ? "true" : null, page: null });
+  };
   const setShowAllTime = (value: boolean) => updateUrlParams({ allTime: value ? "true" : null, page: null });
+
+  // Sync hidePlanned from localStorage on mount (if not already in URL)
+  useEffect(() => {
+    const urlHasHidePlanned = searchParams.has("hidePlanned");
+    if (!urlHasHidePlanned) {
+      const stored = localStorage.getItem("hidePlanned");
+      if (stored === "true") {
+        // Update URL to reflect localStorage preference
+        updateUrlParams({ hidePlanned: "true" });
+      }
+    } else {
+      // Sync URL value to localStorage
+      localStorage.setItem("hidePlanned", hidePlanned ? "true" : "false");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   const {
     selectedMonth,
