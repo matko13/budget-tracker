@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import AddTransactionModal from "@/components/AddTransactionModal";
@@ -42,7 +42,7 @@ interface TransactionsResponse {
   totalPages: number;
 }
 
-export default function TransactionsPage() {
+function TransactionsContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -964,5 +964,20 @@ export default function TransactionsPage() {
         onSuccess={handleCreateSuccess}
       />
     </div>
+  );
+}
+
+export default function TransactionsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 dark:text-slate-400">Ładowanie...</p>
+        </div>
+      </div>
+    }>
+      <TransactionsContent />
+    </Suspense>
   );
 }
