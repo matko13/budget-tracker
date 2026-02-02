@@ -160,7 +160,7 @@ export default async function Home() {
               </h3>
               <p className="text-slate-600 dark:text-slate-400">
                 Wizualne wykresy i raporty pokazują, gdzie idą Twoje pieniądze.
-                Śledź trendy, ustalaj budżety i osiągaj cele finansowe.
+                Śledź trendy i osiągaj swoje cele finansowe.
               </p>
             </div>
           </div>
