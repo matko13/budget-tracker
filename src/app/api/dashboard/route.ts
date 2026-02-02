@@ -51,9 +51,22 @@ export async function GET(request: Request) {
       ?.filter((t: { type: string; is_excluded?: boolean }) => t.type === "income" && !t.is_excluded)
       .reduce((sum: number, t: { amount: number }) => sum + t.amount, 0) || 0;
     
-    const monthlyExpenses = transactions
-      ?.filter((t: { type: string; is_excluded?: boolean }) => t.type === "expense" && !t.is_excluded)
+    // Calculate real expenses (completed transactions, not planned)
+    const realExpenses = transactions
+      ?.filter((t: { type: string; is_excluded?: boolean; payment_status?: string | null }) => 
+        t.type === "expense" && !t.is_excluded && t.payment_status !== "planned"
+      )
       .reduce((sum: number, t: { amount: number }) => sum + t.amount, 0) || 0;
+    
+    // Calculate planned expenses (transactions with payment_status = "planned")
+    const plannedExpenses = transactions
+      ?.filter((t: { type: string; is_excluded?: boolean; payment_status?: string | null }) => 
+        t.type === "expense" && !t.is_excluded && t.payment_status === "planned"
+      )
+      .reduce((sum: number, t: { amount: number }) => sum + t.amount, 0) || 0;
+    
+    // Total expenses (for backward compatibility)
+    const monthlyExpenses = realExpenses + plannedExpenses;
 
     // Calculate spending by category (excluding internal transfers)
     const spendingByCategory: Record<string, { name: string; amount: number; color: string }> = {};
@@ -89,14 +102,20 @@ export async function GET(request: Request) {
 
     // Calculate monthly balance and savings rate
     const monthlyBalance = monthlyIncome - monthlyExpenses;
+    const realBalance = monthlyIncome - realExpenses;
     const savingsRate = monthlyIncome > 0 ? Math.round((monthlyBalance / monthlyIncome) * 100) : 0;
+    const realSavingsRate = monthlyIncome > 0 ? Math.round((realBalance / monthlyIncome) * 100) : 0;
 
     return NextResponse.json({
       accounts: accounts || [],
       monthlyBalance,
+      realBalance,
       savingsRate,
+      realSavingsRate,
       monthlyIncome,
       monthlyExpenses,
+      realExpenses,
+      plannedExpenses,
       categoryBreakdown,
       recentTransactions,
       currentMonth: selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
