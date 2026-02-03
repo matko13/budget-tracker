@@ -54,25 +54,50 @@ export async function POST() {
       });
     }
 
-    // Create a demo account
-    const { data: account, error: accountError } = await supabase
-      .from("accounts")
-      .insert({
+    // Create user accounts
+    const accountsToCreate = [
+      {
         user_id: user.id,
-        external_id: "demo-account-" + Date.now(),
-        iban: "PL61 1090 1014 0000 0712 1981 2874",
-        name: "Konto Direct (Demo)",
+        external_id: "account-wspolne-ing-" + Date.now(),
+        name: "Wspólne ING",
         currency: "PLN",
-        balance: 12847.52,
+        balance: 15000.00,
         balance_updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        is_default: true,
+      },
+      {
+        user_id: user.id,
+        external_id: "account-prywatne-mbank-" + Date.now(),
+        name: "Prywatne mBank",
+        currency: "PLN",
+        balance: 8500.00,
+        balance_updated_at: new Date().toISOString(),
+        is_default: false,
+      },
+      {
+        user_id: user.id,
+        external_id: "account-firmowe-ing-" + Date.now(),
+        name: "Firmowe ING",
+        currency: "PLN",
+        balance: 25000.00,
+        balance_updated_at: new Date().toISOString(),
+        is_default: false,
+      },
+    ];
+
+    const { data: accounts, error: accountError } = await supabase
+      .from("accounts")
+      .insert(accountsToCreate)
+      .select();
 
     if (accountError) {
       console.error("Account error:", accountError);
-      return NextResponse.json({ error: "Failed to create demo account" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to create accounts" }, { status: 500 });
     }
+
+    // Use the default account (Wspólne ING) for demo transactions
+    const account = accounts.find((a: { is_default: boolean }) => a.is_default) || accounts[0];
+
 
     // Get categories for auto-categorization
     const { data: categories } = await supabase

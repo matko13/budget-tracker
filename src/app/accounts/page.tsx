@@ -9,6 +9,7 @@ interface Account {
   name: string;
   currency: string;
   balance: number;
+  is_default?: boolean;
 }
 
 const CURRENCY_OPTIONS = ["PLN", "EUR", "USD", "GBP", "CHF"];
@@ -25,6 +26,7 @@ export default function AccountsPage() {
   const [formName, setFormName] = useState("");
   const [formCurrency, setFormCurrency] = useState("PLN");
   const [formBalance, setFormBalance] = useState("");
+  const [formIsDefault, setFormIsDefault] = useState(false);
 
   const router = useRouter();
 
@@ -56,6 +58,7 @@ export default function AccountsPage() {
     setFormName("");
     setFormCurrency("PLN");
     setFormBalance("");
+    setFormIsDefault(false);
     setError(null);
   };
 
@@ -65,6 +68,7 @@ export default function AccountsPage() {
     setFormName(account.name);
     setFormCurrency(account.currency);
     setFormBalance(account.balance.toString());
+    setFormIsDefault(account.is_default || false);
     setError(null);
   };
 
@@ -92,6 +96,7 @@ export default function AccountsPage() {
         name: formName.trim(),
         currency: formCurrency,
         balance: parseFloat(formBalance) || 0,
+        is_default: formIsDefault,
       };
 
       const response = await fetch(url, {
@@ -263,6 +268,19 @@ export default function AccountsPage() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="isDefault"
+                  checked={formIsDefault}
+                  onChange={(e) => setFormIsDefault(e.target.checked)}
+                  className="w-5 h-5 rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500"
+                />
+                <label htmlFor="isDefault" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Ustaw jako domyślne konto
+                </label>
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
@@ -297,7 +315,14 @@ export default function AccountsPage() {
                   </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-900 dark:text-white">{account.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-slate-900 dark:text-white">{account.name}</p>
+                    {account.is_default && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full">
+                        Domyślne
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
                     {account.currency}
                   </p>

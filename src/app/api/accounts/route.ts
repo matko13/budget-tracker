@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, currency = "PLN", balance = 0 } = await request.json();
+    const { name, currency = "PLN", balance = 0, is_default = false } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         name,
         currency,
         balance,
+        is_default,
       })
       .select()
       .single();
@@ -82,15 +83,20 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id, name, currency, balance } = await request.json();
+    const { id, name, currency, balance, is_default } = await request.json();
 
     if (!id || !name) {
       return NextResponse.json({ error: "ID and name are required" }, { status: 400 });
     }
 
+    const updateData: { name: string; currency?: string; balance?: number; is_default?: boolean } = { name };
+    if (currency !== undefined) updateData.currency = currency;
+    if (balance !== undefined) updateData.balance = balance;
+    if (is_default !== undefined) updateData.is_default = is_default;
+
     const { data: account, error } = await supabase
       .from("accounts")
-      .update({ name, currency, balance })
+      .update(updateData)
       .eq("id", id)
       .eq("user_id", user.id)
       .select()
