@@ -43,25 +43,32 @@ export async function GET(request: Request) {
 
     const offset = (page - 1) * limit;
 
+    // First, get all transactions with basic filters
     let query = supabase
       .from("transactions")
       .select("*, categories(*), accounts(name, iban)", { count: "exact" })
       .eq("user_id", user.id);
 
-    // Apply all filters BEFORE pagination
+    // Category filter
     if (categoryId) {
       query = query.eq("category_id", categoryId);
     }
+    
+    // Account filter  
     if (accountId) {
       query = query.eq("account_id", accountId);
     }
-    // Filter by type - ensure exact match with database enum values
-    if (type && ["income", "expense", "transfer"].includes(type)) {
-      query = query.eq("type", type);
+    
+    // Type filter
+    if (type === "income") {
+      query = query.eq("type", "income");
+    } else if (type === "expense") {
+      query = query.eq("type", "expense");
+    } else if (type === "transfer") {
+      query = query.eq("type", "transfer");
     }
-    if (search) {
-      query = query.or(`description.ilike.%${search}%,merchant_name.ilike.%${search}%`);
-    }
+    
+    // Date filters
     if (startDate) {
       query = query.gte("transaction_date", startDate);
     }
@@ -69,30 +76,34 @@ export async function GET(request: Request) {
       query = query.lte("transaction_date", endDate);
     }
     
-    // Filter by status
+    // Status filter
     if (status === "actual") {
-      // Actual transactions - not recurring generated
-      query = query.eq("is_recurring_generated", false);
+      query = query.neq("is_recurring_generated", true);
     } else if (status === "planned") {
-      // Planned recurring transactions
       query = query.eq("is_recurring_generated", true).eq("payment_status", "planned");
     } else if (status === "completed") {
-      // Completed recurring transactions
       query = query.eq("is_recurring_generated", true).eq("payment_status", "completed");
     }
-    
-    // Hide planned recurring transactions
-    if (hidePlanned) {
-      // Show all except planned recurring transactions
-      query = query.or("is_recurring_generated.eq.false,payment_status.neq.planned");
+
+    // Search filter - this must come after other .eq() filters
+    if (search) {
+      query = query.or(`description.ilike.%${search}%,merchant_name.ilike.%${search}%`);
     }
 
-    // Apply ordering and pagination LAST
+    // Apply ordering and pagination
     query = query
       .order("transaction_date", { ascending: false })
       .range(offset, offset + limit - 1);
 
     const { data: transactions, count, error } = await query;
+    
+    // Filter hidePlanned in memory if needed (Supabase complex OR is tricky)
+    let filteredTransactions = transactions || [];
+    if (hidePlanned && !status && filteredTransactions.length > 0) {
+      filteredTransactions = filteredTransactions.filter(t => 
+        !(t.is_recurring_generated === true && t.payment_status === "planned")
+      );
+    }
 
     if (error) {
       console.error("Query error:", error);
@@ -100,12 +111,12 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      transactions: transactions || [],
+      transactions: filteredTransactions,
       total: count || 0,
       page,
       limit,
       totalPages: Math.ceil((count || 0) / limit),
-      filters: { type, categoryId, search, startDate, endDate },
+      filters: { type, categoryId, search, startDate, endDate, status },
     });
   } catch (error) {
     console.error("Error fetching transactions:", error);
