@@ -46,10 +46,9 @@ export async function GET(request: Request) {
     let query = supabase
       .from("transactions")
       .select("*, categories(*), accounts(name, iban)", { count: "exact" })
-      .eq("user_id", user.id)
-      .order("transaction_date", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .eq("user_id", user.id);
 
+    // Apply all filters BEFORE pagination
     if (categoryId) {
       query = query.eq("category_id", categoryId);
     }
@@ -87,6 +86,11 @@ export async function GET(request: Request) {
       // Show all except planned recurring transactions
       query = query.or("is_recurring_generated.eq.false,payment_status.neq.planned");
     }
+
+    // Apply ordering and pagination LAST
+    query = query
+      .order("transaction_date", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     const { data: transactions, count, error } = await query;
 
