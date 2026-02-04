@@ -17,7 +17,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { type, amount, categoryId, date, description, merchantName, isExcluded, paymentStatus } = body;
+    const { type, amount, categoryId, accountId, date, description, merchantName, isExcluded, paymentStatus } = body;
 
     // Verify the transaction belongs to the user
     const { data: transaction, error: fetchError } = await supabase
@@ -50,6 +50,10 @@ export async function PATCH(
     
     if (categoryId !== undefined) {
       updateData.category_id = categoryId || null;
+    }
+    
+    if (accountId !== undefined) {
+      updateData.account_id = accountId;
     }
     
     if (date !== undefined) {

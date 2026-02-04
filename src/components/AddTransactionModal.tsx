@@ -166,7 +166,10 @@ export default function AddTransactionModal({
         response = await fetch(`/api/transactions/${transaction.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(transactionData),
+          body: JSON.stringify({
+            ...transactionData,
+            accountId: accountId || null,
+          }),
         });
       } else {
         // Create new transaction
