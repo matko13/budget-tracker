@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface Category {
   id: string;
@@ -14,6 +14,19 @@ interface Account {
   name: string;
   currency: string;
   is_default?: boolean;
+}
+
+interface TransactionSuggestion {
+  id: string;
+  description: string;
+  merchantName: string | null;
+  amount: number;
+  categoryId: string | null;
+  categoryName: string | null;
+  categoryIcon: string | null;
+  type: "income" | "expense";
+  source: "transaction" | "recurring";
+  frequency: number;
 }
 
 interface TransactionToEdit {
@@ -56,6 +69,15 @@ export default function AddTransactionModal({
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<TransactionSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+  const descriptionInputRef = useRef<HTMLInputElement>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Prevent background scrolling when modal is open
   useEffect(() => {
@@ -90,6 +112,10 @@ export default function AddTransactionModal({
       setDescription("");
       setMerchantName("");
       setIsExcluded(false);
+      // Reset autocomplete state
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
     }
   }, [isOpen, transaction]);
 
@@ -130,6 +156,123 @@ export default function AddTransactionModal({
       console.error("Error fetching accounts:", err);
     }
   };
+
+  // Fetch suggestions for autocomplete
+  const fetchSuggestions = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    try {
+      const typeParam = type === "transfer" ? "expense" : type;
+      const response = await fetch(
+        `/api/transactions/suggestions?q=${encodeURIComponent(query)}&type=${typeParam}&limit=8`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setSuggestions(data.suggestions || []);
+        setShowSuggestions(data.suggestions?.length > 0);
+        setSelectedSuggestionIndex(-1);
+      }
+    } catch (err) {
+      console.error("Error fetching suggestions:", err);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  }, [type]);
+
+  // Debounced description change handler
+  const handleDescriptionChange = (value: string) => {
+    setDescription(value);
+    
+    // Clear any existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    // Set up new debounced fetch
+    debounceTimerRef.current = setTimeout(() => {
+      fetchSuggestions(value);
+    }, 300);
+  };
+
+  // Handle suggestion selection
+  const handleSelectSuggestion = (suggestion: TransactionSuggestion) => {
+    setDescription(suggestion.description);
+    setAmount(suggestion.amount.toString());
+    if (suggestion.categoryId) {
+      setCategoryId(suggestion.categoryId);
+    }
+    if (suggestion.merchantName) {
+      setMerchantName(suggestion.merchantName);
+    }
+    // Change type if suggestion has different type and we're not in transfer mode
+    if (type !== "transfer" && suggestion.type !== type) {
+      setType(suggestion.type);
+    }
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  // Handle keyboard navigation in suggestions
+  const handleDescriptionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) =>
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedSuggestionIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case "Enter":
+        if (selectedSuggestionIndex >= 0) {
+          e.preventDefault();
+          handleSelectSuggestion(suggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case "Escape":
+        setShowSuggestions(false);
+        setSelectedSuggestionIndex(-1);
+        break;
+    }
+  };
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(event.target as Node) &&
+        descriptionInputRef.current &&
+        !descriptionInputRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const filteredCategories = categories.filter(
     (c) => c.type === type || c.type === "both" || type === "transfer"
@@ -196,6 +339,10 @@ export default function AddTransactionModal({
       setMerchantName("");
       setIsExcluded(false);
       setDate(new Date().toISOString().split("T")[0]);
+      // Reset autocomplete state
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setSelectedSuggestionIndex(-1);
       
       onSuccess();
       onClose();
@@ -351,20 +498,106 @@ export default function AddTransactionModal({
             />
           </div>
 
-          {/* Description */}
-          <div>
+          {/* Description with Autocomplete */}
+          <div className="relative">
             <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Opis
             </label>
-            <input
-              id="description"
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              placeholder="np. Zakupy spożywcze"
-              className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
+            <div className="relative">
+              <input
+                ref={descriptionInputRef}
+                id="description"
+                type="text"
+                value={description}
+                onChange={(e) => handleDescriptionChange(e.target.value)}
+                onKeyDown={handleDescriptionKeyDown}
+                onFocus={() => {
+                  if (suggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                required
+                placeholder="np. Zakupy spożywcze"
+                autoComplete="off"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+              {isLoadingSuggestions && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <svg className="animate-spin h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              )}
+            </div>
+            
+            {/* Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div
+                ref={suggestionsRef}
+                className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-64 overflow-y-auto"
+              >
+                <div className="p-2 text-xs text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                  Wybierz sugestię lub kontynuuj pisanie
+                </div>
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    onClick={() => handleSelectSuggestion(suggestion)}
+                    className={`w-full px-4 py-3 text-left hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
+                      index === selectedSuggestionIndex
+                        ? "bg-emerald-50 dark:bg-emerald-900/30"
+                        : ""
+                    } ${index !== suggestions.length - 1 ? "border-b border-slate-100 dark:border-slate-700" : ""}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-900 dark:text-white truncate">
+                            {suggestion.description}
+                          </span>
+                          {suggestion.source === "recurring" && (
+                            <span className="shrink-0 px-1.5 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
+                              Cykliczny
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {suggestion.merchantName && (
+                            <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                              {suggestion.merchantName}
+                            </span>
+                          )}
+                          {suggestion.categoryName && (
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
+                              {suggestion.categoryIcon} {suggestion.categoryName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0 ml-3 text-right">
+                        <span
+                          className={`font-semibold ${
+                            suggestion.type === "income"
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-red-600 dark:text-red-400"
+                          }`}
+                        >
+                          {suggestion.type === "income" ? "+" : "-"}
+                          {suggestion.amount.toFixed(2)} PLN
+                        </span>
+                        {suggestion.frequency > 1 && suggestion.source === "transaction" && (
+                          <div className="text-xs text-slate-400 dark:text-slate-500">
+                            {suggestion.frequency}x użyte
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Merchant (Optional) */}
