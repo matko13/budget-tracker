@@ -438,10 +438,7 @@ function TransactionsContent() {
               <input
                 type="text"
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Szukaj transakcji..."
                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
               />
@@ -453,11 +450,8 @@ function TransactionsContent() {
               </label>
               <select
                 value={filterType}
-                onChange={(e) => {
-                  setFilterType(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent cursor-pointer"
               >
                 <option value="">Wszystkie typy</option>
                 <option value="income">Przychód</option>
@@ -472,11 +466,8 @@ function TransactionsContent() {
               </label>
               <select
                 value={filterCategory}
-                onChange={(e) => {
-                  setFilterCategory(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent cursor-pointer"
               >
                 <option value="">Wszystkie kategorie</option>
                 {categories.map((category) => (
@@ -493,11 +484,8 @@ function TransactionsContent() {
               </label>
               <select
                 value={filterStatus}
-                onChange={(e) => {
-                  setFilterStatus(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent cursor-pointer"
               >
                 <option value="">Wszystkie statusy</option>
                 <option value="actual">💵 Rzeczywiste</option>
