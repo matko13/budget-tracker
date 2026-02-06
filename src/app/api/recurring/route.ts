@@ -338,6 +338,75 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Sync changes to linked planned (not yet completed) generated transactions
+    // so the transactions list reflects the updated recurring expense details
+    if (data) {
+      const transactionUpdate: Record<string, unknown> = {};
+      
+      if (name !== undefined) {
+        transactionUpdate.description = name;
+        transactionUpdate.merchant_name = name;
+      }
+      if (amount !== undefined) {
+        transactionUpdate.amount = Math.abs(parseFloat(amount));
+      }
+      if (currency !== undefined) {
+        transactionUpdate.currency = currency;
+      }
+      if (categoryId !== undefined) {
+        transactionUpdate.category_id = categoryId || null;
+      }
+      
+      // Update linked planned transactions with new details
+      if (Object.keys(transactionUpdate).length > 0) {
+        const { error: txUpdateError } = await supabase
+          .from("transactions")
+          .update(transactionUpdate)
+          .eq("recurring_expense_id", id)
+          .eq("user_id", user.id)
+          .eq("is_recurring_generated", true)
+          .eq("payment_status", "planned");
+
+        if (txUpdateError) {
+          console.error("Error syncing planned transactions:", txUpdateError);
+          // Non-fatal: the recurring expense was updated, transactions just weren't synced
+        }
+      }
+
+      // If day_of_month changed, update transaction dates for planned transactions
+      if (dayOfMonth !== undefined) {
+        // Fetch all planned generated transactions for this recurring expense
+        const { data: plannedTransactions } = await supabase
+          .from("transactions")
+          .select("id, transaction_date, generated_month")
+          .eq("recurring_expense_id", id)
+          .eq("user_id", user.id)
+          .eq("is_recurring_generated", true)
+          .eq("payment_status", "planned");
+
+        if (plannedTransactions && plannedTransactions.length > 0) {
+          const newDayOfMonth = dayOfMonth || 1;
+          
+          for (const tx of plannedTransactions) {
+            // Determine the month from generated_month or transaction_date
+            const monthStr = tx.generated_month || tx.transaction_date.substring(0, 7);
+            const [txYear, txMonth] = monthStr.split("-").map(Number);
+            const lastDayOfMonth = new Date(txYear, txMonth, 0).getDate();
+            const actualDay = Math.min(newDayOfMonth, lastDayOfMonth);
+            const newDate = `${monthStr}-${String(actualDay).padStart(2, "0")}`;
+
+            if (newDate !== tx.transaction_date) {
+              await supabase
+                .from("transactions")
+                .update({ transaction_date: newDate, booking_date: newDate })
+                .eq("id", tx.id)
+                .eq("user_id", user.id);
+            }
+          }
+        }
+      }
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error:", error);
