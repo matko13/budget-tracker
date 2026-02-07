@@ -202,6 +202,7 @@ INSERT INTO categories (name, icon, color, type, is_system) VALUES
     ('Pielęgnacja', '💇', '#f472b6', 'expense', true),
     ('Fitness', '🏋️', '#10b981', 'expense', true),
     ('Emerytura', '🏦', '#6366f1', 'expense', true),
+    ('Dzieci', '👶', '#fb7185', 'expense', true),
     ('Wynagrodzenie', '💰', '#22c55e', 'income', true),
     ('Freelance', '💻', '#3b82f6', 'income', true),
     ('Inwestycje', '📈', '#f59e0b', 'income', true),
@@ -351,7 +352,28 @@ CROSS JOIN (
         ('Emerytura', 'ike'),
         ('Emerytura', 'ikze'),
         ('Emerytura', 'ppk'),
-        ('Emerytura', 'emerytalne')
+        ('Emerytura', 'emerytalne'),
+        -- Dzieci
+        ('Dzieci', 'przedszkole'),
+        ('Dzieci', 'żłobek'),
+        ('Dzieci', 'zlobek'),
+        ('Dzieci', 'szkoła'),
+        ('Dzieci', 'szkola'),
+        ('Dzieci', 'pampersy'),
+        ('Dzieci', 'pieluchy'),
+        ('Dzieci', 'zabawki'),
+        ('Dzieci', 'dziecko'),
+        ('Dzieci', 'dziecięce'),
+        ('Dzieci', 'dzieciece'),
+        ('Dzieci', 'smyk'),
+        ('Dzieci', 'toys'),
+        ('Dzieci', 'pepco'),
+        ('Dzieci', 'kinder'),
+        ('Dzieci', 'mleko dla dzieci'),
+        ('Dzieci', 'odzież dziecięca'),
+        ('Dzieci', 'odziez dziecieca'),
+        ('Dzieci', 'kid'),
+        ('Dzieci', 'baby')
 ) AS k(category_name, keyword) ON c.name = k.category_name
 WHERE c.is_system = true;
 
