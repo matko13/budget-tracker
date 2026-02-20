@@ -89,7 +89,7 @@ export async function ensureRecurringTransactions(
     );
   }
 
-  // Clean up generated planned transactions for expenses that are now skipped
+  // Mark generated transactions as skipped for expenses that have a skip override
   const skippedExpenseIds = recurringExpenses
     .filter((expense: { id: string }) => {
       const override = overridesMap.get(expense.id);
@@ -100,11 +100,11 @@ export async function ensureRecurringTransactions(
   if (skippedExpenseIds.length > 0) {
     await supabase
       .from("transactions")
-      .delete()
+      .update({ payment_status: "skipped" })
       .in("recurring_expense_id", skippedExpenseIds)
       .eq("user_id", userId)
       .eq("is_recurring_generated", true)
-      .eq("payment_status", "planned")
+      .in("payment_status", ["planned", "completed"])
       .gte("transaction_date", monthStart)
       .lte("transaction_date", monthEnd);
   }

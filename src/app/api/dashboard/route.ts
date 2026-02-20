@@ -37,11 +37,12 @@ export async function GET(request: Request) {
       .toISOString()
       .split("T")[0];
 
-    // Get this month's transactions
+    // Get this month's transactions (exclude skipped)
     const { data: transactions } = await supabase
       .from("transactions")
       .select("*, categories(*)")
       .eq("user_id", user.id)
+      .neq("payment_status", "skipped")
       .gte("transaction_date", startOfMonth)
       .lte("transaction_date", endOfMonth)
       .order("transaction_date", { ascending: false });

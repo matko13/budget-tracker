@@ -170,7 +170,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
     }
 
-    // For recurring-generated transactions, create a skip override to prevent regeneration
+    // For recurring-generated transactions, mark as skipped instead of deleting.
+    // The row stays in the DB so the unique index prevents regeneration.
     if (transaction.is_recurring_generated && transaction.recurring_expense_id) {
       const monthStr = transaction.generated_month
         || transaction.transaction_date.substring(0, 7);
@@ -188,8 +189,21 @@ export async function DELETE(
           },
           { onConflict: "recurring_expense_id,override_month" }
         );
+
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ payment_status: "skipped" })
+        .eq("id", id);
+
+      if (updateError) {
+        console.error("Error skipping transaction:", updateError);
+        return NextResponse.json({ error: "Failed to skip transaction" }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true });
     }
 
+    // Non-recurring transactions: actually delete
     const { error: deleteError } = await supabase
       .from("transactions")
       .delete()

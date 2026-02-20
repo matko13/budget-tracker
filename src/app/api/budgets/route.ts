@@ -70,6 +70,7 @@ export async function GET(request: Request) {
       .select("category_id, amount, type")
       .eq("user_id", user.id)
       .eq("type", "expense")
+      .neq("payment_status", "skipped")
       .gte("transaction_date", startOfMonth)
       .lte("transaction_date", endOfMonth);
 
