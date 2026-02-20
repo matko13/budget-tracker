@@ -69,19 +69,31 @@ export async function POST(request: Request) {
       );
     }
 
-    // When skipping, remove the already-generated planned transaction for this month
-    if (isSkipped) {
-      const monthStart = overrideMonth;
-      const [y, m] = month.split("-").map(Number);
-      const monthEnd = new Date(y, m, 0).toISOString().split("T")[0];
+    const [y, m] = month.split("-").map(Number);
+    const monthStart = overrideMonth;
+    const monthEnd = new Date(y, m, 0).toISOString().split("T")[0];
 
+    if (isSkipped) {
+      // Mark the generated transaction as skipped so it's hidden but keeps its row
+      // (the unique index on generated_month prevents regeneration)
       await supabase
         .from("transactions")
-        .delete()
+        .update({ payment_status: "skipped" })
         .eq("recurring_expense_id", recurringExpenseId)
         .eq("user_id", user.id)
         .eq("is_recurring_generated", true)
-        .eq("payment_status", "planned")
+        .in("payment_status", ["planned", "completed"])
+        .gte("transaction_date", monthStart)
+        .lte("transaction_date", monthEnd);
+    } else {
+      // Un-skipping: restore the transaction to planned
+      await supabase
+        .from("transactions")
+        .update({ payment_status: "planned" })
+        .eq("recurring_expense_id", recurringExpenseId)
+        .eq("user_id", user.id)
+        .eq("is_recurring_generated", true)
+        .eq("payment_status", "skipped")
         .gte("transaction_date", monthStart)
         .lte("transaction_date", monthEnd);
     }

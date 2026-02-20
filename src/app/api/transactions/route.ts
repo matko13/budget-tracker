@@ -43,11 +43,12 @@ export async function GET(request: Request) {
 
     const offset = (page - 1) * limit;
 
-    // First, get all transactions with basic filters
+    // First, get all transactions with basic filters (always exclude skipped)
     let query = supabase
       .from("transactions")
       .select("*, categories(*), accounts(name, iban)", { count: "exact" })
-      .eq("user_id", user.id);
+      .eq("user_id", user.id)
+      .neq("payment_status", "skipped");
 
     // Category filter
     if (categoryId) {
