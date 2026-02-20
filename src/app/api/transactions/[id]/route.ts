@@ -159,16 +159,35 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verify the transaction belongs to the user
     const { data: transaction, error: fetchError } = await supabase
       .from("transactions")
-      .select("id")
+      .select("id, is_recurring_generated, recurring_expense_id, transaction_date, generated_month")
       .eq("id", id)
       .eq("user_id", user.id)
       .single();
 
     if (fetchError || !transaction) {
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
+    }
+
+    // For recurring-generated transactions, create a skip override to prevent regeneration
+    if (transaction.is_recurring_generated && transaction.recurring_expense_id) {
+      const monthStr = transaction.generated_month
+        || transaction.transaction_date.substring(0, 7);
+      const overrideMonth = `${monthStr}-01`;
+
+      await supabase
+        .from("recurring_expense_overrides")
+        .upsert(
+          {
+            recurring_expense_id: transaction.recurring_expense_id,
+            user_id: user.id,
+            override_month: overrideMonth,
+            is_skipped: true,
+            is_manually_confirmed: false,
+          },
+          { onConflict: "recurring_expense_id,override_month" }
+        );
     }
 
     const { error: deleteError } = await supabase
