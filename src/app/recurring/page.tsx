@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AddRecurringModal from "@/components/AddRecurringModal";
+import BottomSheet, { BottomSheetAction } from "@/components/BottomSheet";
 import { useMonth } from "@/contexts/MonthContext";
 
 interface Category {
@@ -89,6 +90,7 @@ export default function RecurringExpensesPage() {
   const [overrideExpense, setOverrideExpense] = useState<RecurringExpense | null>(null);
   const [rematching, setRematching] = useState(false);
   const [rematchResult, setRematchResult] = useState<string | null>(null);
+  const [bottomSheetExpense, setBottomSheetExpense] = useState<RecurringExpense | null>(null);
   const router = useRouter();
 
   const {
@@ -291,6 +293,92 @@ export default function RecurringExpensesPage() {
       style: "currency",
       currency,
     }).format(amount);
+  };
+
+  const buildRecurringMobileActions = (expense: RecurringExpense): BottomSheetAction[] => {
+    const actions: BottomSheetAction[] = [];
+
+    if (expense.is_active && expense.isDueThisMonth && !expense.isSkipped && !expense.hasCompletedPayment) {
+      actions.push({
+        label: expense.isManuallyConfirmed ? "Cofnij potwierdzenie" : "Oznacz jako opłacone",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        variant: "success",
+        active: expense.isManuallyConfirmed,
+        onClick: () => handleMarkAsPaid(expense),
+      });
+    }
+
+    if (expense.is_active && expense.isDueThisMonth) {
+      actions.push({
+        label: expense.isSkipped ? "Przywróć w tym miesiącu" : "Pomiń w tym miesiącu",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+          </svg>
+        ),
+        variant: "warning",
+        active: expense.isSkipped,
+        onClick: () => handleToggleSkip(expense),
+      });
+    }
+
+    if (expense.is_active && expense.isDueThisMonth && !expense.isSkipped) {
+      actions.push({
+        label: expense.override?.override_amount !== null && expense.override?.override_amount !== undefined
+          ? "Zmień kwotę na ten miesiąc (zmieniona)"
+          : "Zmień kwotę na ten miesiąc",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        active: expense.override?.override_amount !== null && expense.override?.override_amount !== undefined,
+        onClick: () => handleOpenOverride(expense),
+      });
+    }
+
+    actions.push({
+      label: expense.is_active ? "Dezaktywuj" : "Aktywuj",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {expense.is_active ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          )}
+        </svg>
+      ),
+      variant: expense.is_active ? "warning" : "success",
+      onClick: () => handleToggleActive(expense),
+    });
+
+    actions.push({
+      label: "Edytuj",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      onClick: () => handleEdit(expense),
+    });
+
+    actions.push({
+      label: "Usuń na stałe",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      variant: "danger",
+      disabled: deletingId === expense.id,
+      onClick: () => handleDelete(expense.id),
+    });
+
+    return actions;
   };
 
   return (
@@ -529,7 +617,7 @@ export default function RecurringExpensesPage() {
                       <span>{expense.categories?.name || "Bez kategorii"}</span>
                     </div>
                     
-                    {/* Row 3: Status badges + Actions */}
+                    {/* Row 3: Status badges + 3-dot menu */}
                     <div className="flex items-center justify-between pl-[52px]">
                       <div className="flex items-center gap-1.5">
                         {!expense.is_active && (
@@ -563,85 +651,17 @@ export default function RecurringExpensesPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div className="flex items-center gap-1">
-                        {expense.is_active && expense.isDueThisMonth && !expense.isSkipped && !expense.hasCompletedPayment && (
-                          <button
-                            onClick={() => handleMarkAsPaid(expense)}
-                            className={`p-1.5 rounded-lg ${
-                              expense.isManuallyConfirmed
-                                ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                                : expense.isOverdue
-                                  ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                                  : "bg-slate-100 dark:bg-slate-700 text-slate-400"
-                            }`}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                        )}
-                        {expense.is_active && expense.isDueThisMonth && (
-                          <button
-                            onClick={() => handleToggleSkip(expense)}
-                            className={`p-1.5 rounded-lg ${
-                              expense.isSkipped
-                                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                                : "bg-slate-100 dark:bg-slate-700 text-slate-400"
-                            }`}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                            </svg>
-                          </button>
-                        )}
-                        {expense.is_active && expense.isDueThisMonth && !expense.isSkipped && (
-                          <button
-                            onClick={() => handleOpenOverride(expense)}
-                            className={`p-1.5 rounded-lg ${
-                              expense.override?.override_amount !== null && expense.override?.override_amount !== undefined
-                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                : "bg-slate-100 dark:bg-slate-700 text-slate-400"
-                            }`}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleToggleActive(expense)}
-                          className={`p-1.5 rounded-lg ${
-                            expense.is_active
-                              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                              : "bg-slate-100 dark:bg-slate-700 text-slate-400"
-                          }`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            {expense.is_active ? (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            ) : (
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                            )}
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleEdit(expense)}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(expense.id)}
-                          disabled={deletingId === expense.id}
-                          className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 disabled:opacity-50"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setBottomSheetExpense(expense)}
+                        className="p-2 -mr-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        aria-label="Więcej akcji"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <circle cx="12" cy="5" r="2" />
+                          <circle cx="12" cy="12" r="2" />
+                          <circle cx="12" cy="19" r="2" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
 
@@ -1007,6 +1027,15 @@ export default function RecurringExpensesPage() {
           onSuccess={handleOverrideSuccess}
         />
       )}
+
+      {/* Mobile Bottom Sheet */}
+      <BottomSheet
+        isOpen={bottomSheetExpense !== null}
+        onClose={() => setBottomSheetExpense(null)}
+        title={bottomSheetExpense?.name}
+        subtitle={bottomSheetExpense ? `-${formatCurrency(bottomSheetExpense.effectiveAmount, bottomSheetExpense.currency)}` : undefined}
+        actions={bottomSheetExpense ? buildRecurringMobileActions(bottomSheetExpense) : []}
+      />
     </div>
   );
 }

@@ -89,6 +89,26 @@ export async function ensureRecurringTransactions(
     );
   }
 
+  // Clean up generated planned transactions for expenses that are now skipped
+  const skippedExpenseIds = recurringExpenses
+    .filter((expense: { id: string }) => {
+      const override = overridesMap.get(expense.id);
+      return override?.is_skipped && existingRecurringIds.has(expense.id);
+    })
+    .map((expense: { id: string }) => expense.id);
+
+  if (skippedExpenseIds.length > 0) {
+    await supabase
+      .from("transactions")
+      .delete()
+      .in("recurring_expense_id", skippedExpenseIds)
+      .eq("user_id", userId)
+      .eq("is_recurring_generated", true)
+      .eq("payment_status", "planned")
+      .gte("transaction_date", monthStart)
+      .lte("transaction_date", monthEnd);
+  }
+
   // Filter to expenses that need to be generated
   const toGenerate = recurringExpenses.filter((expense: { 
     id: string; 

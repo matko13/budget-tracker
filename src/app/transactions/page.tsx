@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import AddTransactionModal from "@/components/AddTransactionModal";
+import BottomSheet, { BottomSheetAction } from "@/components/BottomSheet";
 import { useMonth } from "@/contexts/MonthContext";
 
 interface Category {
@@ -55,6 +56,7 @@ function TransactionsContent() {
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [bottomSheetTransaction, setBottomSheetTransaction] = useState<Transaction | null>(null);
 
   // Read filters from URL params
   const page = parseInt(searchParams.get("page") || "1");
@@ -278,10 +280,6 @@ function TransactionsContent() {
   };
 
   const handleDeleteTransaction = async (transactionId: string) => {
-    if (!confirm("Czy na pewno chcesz usunąć tę transakcję?")) {
-      return;
-    }
-
     setDeletingTransaction(transactionId);
     try {
       const response = await fetch(`/api/transactions/${transactionId}`, {
@@ -291,8 +289,8 @@ function TransactionsContent() {
       if (response.ok) {
         fetchTransactions();
       } else {
-        const data = await response.json();
-        alert(data.error || "Nie udało się usunąć transakcji");
+        const errData = await response.json();
+        alert(errData.error || "Nie udało się usunąć transakcji");
       }
     } catch (error) {
       console.error("Error deleting transaction:", error);
@@ -336,6 +334,74 @@ function TransactionsContent() {
       month: "long",
       year: "numeric",
     });
+  };
+
+  const handleDeleteWithConfirm = (transaction: Transaction) => {
+    const isRecurring = transaction.is_recurring_generated;
+    const message = isRecurring
+      ? "Czy chcesz pominąć tę płatność cykliczną w tym miesiącu? Zostanie usunięta z listy i nie pojawi się ponownie."
+      : "Czy na pewno chcesz usunąć tę transakcję?";
+
+    if (!confirm(message)) return;
+
+    handleDeleteTransaction(transaction.id);
+  };
+
+  const buildMobileActions = (transaction: Transaction): BottomSheetAction[] => {
+    const actions: BottomSheetAction[] = [];
+
+    if (transaction.is_recurring_generated) {
+      actions.push({
+        label: transaction.payment_status === "completed" ? "Oznacz jako zaplanowane" : "Oznacz jako opłacone",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {transaction.payment_status === "completed" ? (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            ) : (
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            )}
+          </svg>
+        ),
+        variant: transaction.payment_status === "completed" ? "warning" : "success",
+        active: transaction.payment_status === "completed",
+        onClick: () => handleTogglePaymentStatus(transaction.id, transaction.payment_status),
+      });
+    }
+
+    actions.push({
+      label: "Edytuj",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      onClick: () => handleEditClick(transaction),
+    });
+
+    actions.push({
+      label: transaction.is_excluded ? "Uwzględnij w sumach" : "Oznacz jako przelew wewnętrzny",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+      ),
+      active: transaction.is_excluded,
+      onClick: () => handleToggleExcluded(transaction.id, transaction.is_excluded),
+    });
+
+    actions.push({
+      label: transaction.is_recurring_generated ? "Pomiń w tym miesiącu" : "Usuń",
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      variant: "danger",
+      disabled: deletingTransaction === transaction.id,
+      onClick: () => handleDeleteWithConfirm(transaction),
+    });
+
+    return actions;
   };
 
   return (
@@ -661,7 +727,7 @@ function TransactionsContent() {
                         )}
                       </div>
                       
-                      {/* Row 3: Badges + Actions */}
+                      {/* Row 3: Badges + 3-dot menu */}
                       <div className="flex items-center justify-between pl-[52px]">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {transaction.is_recurring_generated && transaction.payment_status === "planned" && (
@@ -691,55 +757,17 @@ function TransactionsContent() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          {transaction.is_recurring_generated && (
-                            <button
-                              onClick={() => handleTogglePaymentStatus(transaction.id, transaction.payment_status)}
-                              className={`p-1.5 rounded-lg ${
-                                transaction.payment_status === "completed"
-                                  ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400"
-                                  : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                              }`}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {transaction.payment_status === "completed" ? (
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                ) : (
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                )}
-                              </svg>
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleEditClick(transaction)}
-                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTransaction(transaction.id)}
-                            disabled={deletingTransaction === transaction.id}
-                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 disabled:opacity-50"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleToggleExcluded(transaction.id, transaction.is_excluded)}
-                            className={`p-1.5 rounded-lg ${
-                              transaction.is_excluded
-                                ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                                : "bg-slate-100 dark:bg-slate-700 text-slate-400"
-                            }`}
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                            </svg>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => setBottomSheetTransaction(transaction)}
+                          className="p-2 -mr-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          aria-label="Więcej akcji"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="5" r="2" />
+                            <circle cx="12" cy="12" r="2" />
+                            <circle cx="12" cy="19" r="2" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
 
@@ -844,9 +872,9 @@ function TransactionsContent() {
                         </button>
 
                         <button
-                          onClick={() => handleDeleteTransaction(transaction.id)}
+                          onClick={() => handleDeleteWithConfirm(transaction)}
                           disabled={deletingTransaction === transaction.id}
-                          title="Usuń transakcję"
+                          title={transaction.is_recurring_generated ? "Pomiń w tym miesiącu" : "Usuń transakcję"}
                           className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -970,6 +998,15 @@ function TransactionsContent() {
         isOpen={createModalOpen}
         onClose={handleCreateClose}
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Mobile Bottom Sheet */}
+      <BottomSheet
+        isOpen={bottomSheetTransaction !== null}
+        onClose={() => setBottomSheetTransaction(null)}
+        title={bottomSheetTransaction?.merchant_name || bottomSheetTransaction?.description}
+        subtitle={bottomSheetTransaction ? `${bottomSheetTransaction.type === "income" ? "+" : "-"}${formatCurrency(bottomSheetTransaction.amount, bottomSheetTransaction.currency)}` : undefined}
+        actions={bottomSheetTransaction ? buildMobileActions(bottomSheetTransaction) : []}
       />
     </div>
   );

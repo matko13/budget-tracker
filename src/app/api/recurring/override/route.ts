@@ -69,6 +69,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // When skipping, remove the already-generated planned transaction for this month
+    if (isSkipped) {
+      const monthStart = overrideMonth;
+      const [y, m] = month.split("-").map(Number);
+      const monthEnd = new Date(y, m, 0).toISOString().split("T")[0];
+
+      await supabase
+        .from("transactions")
+        .delete()
+        .eq("recurring_expense_id", recurringExpenseId)
+        .eq("user_id", user.id)
+        .eq("is_recurring_generated", true)
+        .eq("payment_status", "planned")
+        .gte("transaction_date", monthStart)
+        .lte("transaction_date", monthEnd);
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error:", error);
