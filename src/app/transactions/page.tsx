@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import AddTransactionModal from "@/components/AddTransactionModal";
+import ConvertToRecurringModal from "@/components/ConvertToRecurringModal";
 import BottomSheet, { BottomSheetAction } from "@/components/BottomSheet";
 import { useMonth } from "@/contexts/MonthContext";
 
@@ -56,6 +57,7 @@ function TransactionsContent() {
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [convertToRecurringTransaction, setConvertToRecurringTransaction] = useState<Transaction | null>(null);
   const [bottomSheetTransaction, setBottomSheetTransaction] = useState<Transaction | null>(null);
 
   // Read filters from URL params
@@ -377,6 +379,19 @@ function TransactionsContent() {
       ),
       onClick: () => handleEditClick(transaction),
     });
+
+    if (!transaction.is_recurring_generated && transaction.type === "expense") {
+      actions.push({
+        label: "Przekształć w cykliczny",
+        icon: (
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        ),
+        variant: "default",
+        onClick: () => setConvertToRecurringTransaction(transaction),
+      });
+    }
 
     actions.push({
       label: transaction.is_excluded ? "Uwzględnij w sumach" : "Oznacz jako przelew wewnętrzny",
@@ -871,6 +886,18 @@ function TransactionsContent() {
                           </svg>
                         </button>
 
+                        {!transaction.is_recurring_generated && transaction.type === "expense" && (
+                          <button
+                            onClick={() => setConvertToRecurringTransaction(transaction)}
+                            title="Przekształć w wydatek cykliczny"
+                            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handleDeleteWithConfirm(transaction)}
                           disabled={deletingTransaction === transaction.id}
@@ -998,6 +1025,17 @@ function TransactionsContent() {
         isOpen={createModalOpen}
         onClose={handleCreateClose}
         onSuccess={handleCreateSuccess}
+      />
+
+      {/* Convert to Recurring Modal */}
+      <ConvertToRecurringModal
+        isOpen={convertToRecurringTransaction !== null}
+        onClose={() => setConvertToRecurringTransaction(null)}
+        onSuccess={() => {
+          fetchTransactions();
+          setConvertToRecurringTransaction(null);
+        }}
+        transaction={convertToRecurringTransaction}
       />
 
       {/* Mobile Bottom Sheet */}
