@@ -306,13 +306,14 @@ export default function AddTransactionModal({
 
       if (isEditMode && transaction) {
         // Update existing transaction
+        const editPayload: Record<string, unknown> = { ...transactionData };
+        if (accountId) {
+          editPayload.accountId = accountId;
+        }
         response = await fetch(`/api/transactions/${transaction.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...transactionData,
-            accountId: accountId || null,
-          }),
+          body: JSON.stringify(editPayload),
         });
       } else {
         // Create new transaction

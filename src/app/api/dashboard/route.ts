@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     // Get this month's transactions (exclude skipped)
     const { data: transactions } = await supabase
       .from("transactions")
-      .select("*, categories(*)")
+      .select("*, categories(*), accounts(*)")
       .eq("user_id", user.id)
       .neq("payment_status", "skipped")
       .gte("transaction_date", startOfMonth)
