@@ -52,7 +52,7 @@ export async function PATCH(
       updateData.category_id = categoryId || null;
     }
     
-    if (accountId !== undefined) {
+    if (accountId) {
       updateData.account_id = accountId;
     }
     

@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     // First, get all transactions with basic filters (always exclude skipped)
     let query = supabase
       .from("transactions")
-      .select("*, categories(*), accounts(name, iban)", { count: "exact" })
+      .select("*, categories(*), accounts(id, name, iban)", { count: "exact" })
       .eq("user_id", user.id)
       .neq("payment_status", "skipped");
 
