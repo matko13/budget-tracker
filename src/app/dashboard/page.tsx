@@ -31,6 +31,8 @@ interface Transaction {
   transaction_date: string;
   type: "income" | "expense" | "transfer";
   categories: Category | null;
+  accounts: Account | null;
+  is_excluded: boolean;
   payment_status: "completed" | "planned" | "skipped" | null;
   is_recurring_generated: boolean;
 }
@@ -57,6 +59,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [user, setUser] = useState<{ email: string } | null>(null);
   const [hidePlanned, setHidePlanned] = useState(false);
   const router = useRouter();
@@ -145,6 +149,20 @@ export default function DashboardPage() {
       day: "numeric",
       month: "short",
     });
+  };
+
+  const handleEditClick = (transaction: Transaction) => {
+    setTransactionToEdit(transaction);
+    setEditModalOpen(true);
+  };
+
+  const handleEditClose = () => {
+    setEditModalOpen(false);
+    setTransactionToEdit(null);
+  };
+
+  const handleEditSuccess = () => {
+    fetchDashboard();
   };
 
   if (loading) {
@@ -461,7 +479,8 @@ export default function DashboardPage() {
               {data.recentTransactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                  className="group flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors cursor-pointer"
+                  onClick={() => handleEditClick(transaction)}
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-lg relative"
@@ -472,7 +491,6 @@ export default function DashboardPage() {
                     }}
                   >
                     {transaction.categories?.icon || (transaction.type === "income" ? "💰" : "💸")}
-                    {/* Status indicator for recurring generated transactions */}
                     {transaction.is_recurring_generated && (
                       <div
                         className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 ${
@@ -497,18 +515,32 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
-                  <p
-                    className={`font-semibold ${
-                      transaction.type === "income"
-                        ? "text-emerald-600"
-                        : transaction.payment_status === "planned"
-                        ? "text-slate-400 dark:text-slate-500"
-                        : "text-slate-900 dark:text-white"
-                    }`}
-                  >
-                    {transaction.type === "income" ? "+" : "-"}
-                    {formatCurrency(transaction.amount, transaction.currency)}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(transaction);
+                      }}
+                      title="Edytuj transakcję"
+                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <p
+                      className={`font-semibold ${
+                        transaction.type === "income"
+                          ? "text-emerald-600"
+                          : transaction.payment_status === "planned"
+                          ? "text-slate-400 dark:text-slate-500"
+                          : "text-slate-900 dark:text-white"
+                      }`}
+                    >
+                      {transaction.type === "income" ? "+" : "-"}
+                      {formatCurrency(transaction.amount, transaction.currency)}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -528,6 +560,14 @@ export default function DashboardPage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={fetchDashboard}
+      />
+
+      {/* Edit Transaction Modal */}
+      <AddTransactionModal
+        isOpen={editModalOpen}
+        onClose={handleEditClose}
+        onSuccess={handleEditSuccess}
+        transaction={transactionToEdit}
       />
     </div>
   );
