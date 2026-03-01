@@ -65,8 +65,10 @@ export async function GET(request: Request) {
     }
 
     // Get target month's start and end dates
-    const monthStart = new Date(year, month, 1).toISOString().split("T")[0];
-    const monthEnd = new Date(year, month + 1, 0).toISOString().split("T")[0];
+    const mm = String(month + 1).padStart(2, "0");
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const monthStart = `${year}-${mm}-01`;
+    const monthEnd = `${year}-${mm}-${String(lastDay).padStart(2, "0")}`;
     const monthKey = `${year}-${String(month + 1).padStart(2, "0")}-01`; // For overrides lookup
 
     // Get overrides for this month

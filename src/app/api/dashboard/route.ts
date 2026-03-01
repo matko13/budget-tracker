@@ -30,12 +30,10 @@ export async function GET(request: Request) {
       .eq("user_id", user.id);
 
     // Get selected month date range
-    const startOfMonth = new Date(year, month, 1)
-      .toISOString()
-      .split("T")[0];
-    const endOfMonth = new Date(year, month + 1, 0)
-      .toISOString()
-      .split("T")[0];
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const mm = String(month + 1).padStart(2, "0");
+    const startOfMonth = `${year}-${mm}-01`;
+    const endOfMonth = `${year}-${mm}-${String(lastDay).padStart(2, "0")}`;
 
     // Get this month's transactions (exclude skipped)
     const { data: transactions } = await supabase

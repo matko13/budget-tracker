@@ -31,7 +31,8 @@ export async function ensureRecurringTransactions(
 ) {
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
   const monthStart = `${monthStr}-01`;
-  const monthEnd = new Date(year, month + 1, 0).toISOString().split("T")[0];
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const monthEnd = `${monthStr}-${String(lastDay).padStart(2, "0")}`;
 
   // Get all active recurring expenses
   const { data: recurringExpenses } = await supabase
