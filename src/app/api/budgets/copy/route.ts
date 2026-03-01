@@ -3,7 +3,9 @@ import { createUntypedClient } from "@/lib/supabase/server-untyped";
 
 // Helper to get first day of month in YYYY-MM-DD format
 function getMonthStart(date: Date): string {
-  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split("T")[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01`;
 }
 
 // Helper to get previous month date

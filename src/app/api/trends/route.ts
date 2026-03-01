@@ -18,8 +18,11 @@ export async function GET() {
     const months: { month: string; year: number; startDate: string; endDate: string }[] = [];
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const startDate = date.toISOString().split("T")[0];
-      const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split("T")[0];
+      const sy = date.getFullYear();
+      const sm = String(date.getMonth() + 1).padStart(2, "0");
+      const startDate = `${sy}-${sm}-01`;
+      const lastDay = new Date(sy, date.getMonth() + 1, 0).getDate();
+      const endDate = `${sy}-${sm}-${String(lastDay).padStart(2, "0")}`;
       months.push({
         month: date.toLocaleDateString("en-US", { month: "short" }),
         year: date.getFullYear(),
@@ -67,7 +70,8 @@ export async function GET() {
     
     const dailyData: { day: number; amount: number }[] = [];
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayDate = new Date(now.getFullYear(), now.getMonth(), day).toISOString().split("T")[0];
+      const dm = String(now.getMonth() + 1).padStart(2, "0");
+      const dayDate = `${now.getFullYear()}-${dm}-${String(day).padStart(2, "0")}`;
       const dayExpenses = (transactions || [])
         .filter(
           (t: { type: string; transaction_date: string }) =>
@@ -79,10 +83,15 @@ export async function GET() {
     }
 
     // Calculate category trends (current month vs last month)
-    const currentMonthStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const currentMonthEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
-    const lastMonthStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split("T")[0];
-    const lastMonthEndDate = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0];
+    const cmm = String(now.getMonth() + 1).padStart(2, "0");
+    const currentMonthStartDate = `${now.getFullYear()}-${cmm}-01`;
+    const currentMonthLastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currentMonthEndDate = `${now.getFullYear()}-${cmm}-${String(currentMonthLastDay).padStart(2, "0")}`;
+    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lmm = String(lastMonthDate.getMonth() + 1).padStart(2, "0");
+    const lastMonthStartDate = `${lastMonthDate.getFullYear()}-${lmm}-01`;
+    const lastMonthLastDay = new Date(lastMonthDate.getFullYear(), lastMonthDate.getMonth() + 1, 0).getDate();
+    const lastMonthEndDate = `${lastMonthDate.getFullYear()}-${lmm}-${String(lastMonthLastDay).padStart(2, "0")}`;
 
     const categoryTrends: Record<string, { name: string; color: string; current: number; previous: number }> = {};
 

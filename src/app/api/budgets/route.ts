@@ -4,12 +4,17 @@ import { ensureBudgetsForMonth } from "@/lib/budget-utils";
 
 // Helper to get first day of month in YYYY-MM-DD format
 function getMonthStart(date: Date): string {
-  return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split("T")[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01`;
 }
 
 // Helper to get last day of month in YYYY-MM-DD format
 function getMonthEnd(date: Date): string {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split("T")[0];
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const lastDay = new Date(y, date.getMonth() + 1, 0).getDate();
+  return `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
 }
 
 // Helper to get previous month date

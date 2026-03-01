@@ -71,7 +71,8 @@ export async function POST(request: Request) {
 
     const [y, m] = month.split("-").map(Number);
     const monthStart = overrideMonth;
-    const monthEnd = new Date(y, m, 0).toISOString().split("T")[0];
+    const lastDay = new Date(y, m, 0).getDate();
+    const monthEnd = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
     if (isSkipped) {
       // Mark the generated transaction as skipped so it's hidden but keeps its row

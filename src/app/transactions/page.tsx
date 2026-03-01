@@ -154,8 +154,10 @@ function TransactionsContent() {
   };
 
   const getMonthDateRange = (month: number, year: number) => {
-    const startDate = new Date(year, month, 1).toISOString().split("T")[0];
-    const endDate = new Date(year, month + 1, 0).toISOString().split("T")[0];
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const mm = String(month + 1).padStart(2, "0");
+    const startDate = `${year}-${mm}-01`;
+    const endDate = `${year}-${mm}-${String(lastDay).padStart(2, "0")}`;
     return { startDate, endDate };
   };
 
