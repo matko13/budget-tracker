@@ -100,6 +100,8 @@ export async function POST(request: Request) {
         booking_date: date,
         type,
         is_excluded: isExcluded || false,
+        payment_status: "completed",
+        is_recurring_generated: false,
       })
       .select("*, categories(*)")
       .single();

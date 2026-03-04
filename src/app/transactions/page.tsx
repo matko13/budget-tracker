@@ -52,6 +52,7 @@ function TransactionsContent() {
   const [data, setData] = useState<TransactionsResponse | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
@@ -163,6 +164,7 @@ function TransactionsContent() {
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams({ 
         page: page.toString(), 
@@ -193,12 +195,13 @@ function TransactionsContent() {
           router.push("/login");
           return;
         }
-        throw new Error("Failed to fetch transactions");
+        throw new Error("Nie udało się pobrać transakcji");
       }
       const transactionsData = await response.json();
       setData(transactionsData);
-    } catch (error) {
-      console.error("Error fetching transactions:", error);
+    } catch (err) {
+      console.error("Error fetching transactions:", err);
+      setError(err instanceof Error ? err.message : "Wystąpił błąd podczas ładowania transakcji");
     } finally {
       setLoading(false);
     }
@@ -655,6 +658,24 @@ function TransactionsContent() {
             <div className="p-12 text-center">
               <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-slate-600 dark:text-slate-400">Ładowanie transakcji...</p>
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                Błąd ładowania
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">{error}</p>
+              <button
+                onClick={fetchTransactions}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+              >
+                Spróbuj ponownie
+              </button>
             </div>
           ) : data?.transactions && data.transactions.length > 0 ? (
             <>

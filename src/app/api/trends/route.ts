@@ -37,7 +37,7 @@ export async function GET() {
       .from("transactions")
       .select("amount, type, transaction_date, category_id, categories(name, color)")
       .eq("user_id", user.id)
-      .neq("payment_status", "skipped")
+      .or("payment_status.neq.skipped,payment_status.is.null")
       .gte("transaction_date", sixMonthsAgo)
       .order("transaction_date", { ascending: true });
 

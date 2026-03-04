@@ -44,11 +44,12 @@ export async function GET(request: Request) {
     const offset = (page - 1) * limit;
 
     // First, get all transactions with basic filters (always exclude skipped)
+    // Use .or() instead of .neq() because PostgreSQL's != does not match NULL values
     let query = supabase
       .from("transactions")
       .select("*, categories(*), accounts(id, name, iban)", { count: "exact" })
       .eq("user_id", user.id)
-      .neq("payment_status", "skipped");
+      .or("payment_status.neq.skipped,payment_status.is.null");
 
     // Category filter
     if (categoryId === "uncategorized") {

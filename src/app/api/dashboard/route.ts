@@ -36,11 +36,12 @@ export async function GET(request: Request) {
     const endOfMonth = `${year}-${mm}-${String(lastDay).padStart(2, "0")}`;
 
     // Get this month's transactions (exclude skipped)
+    // Use .or() instead of .neq() because PostgreSQL's != does not match NULL values
     const { data: transactions } = await supabase
       .from("transactions")
       .select("*, categories(*)")
       .eq("user_id", user.id)
-      .neq("payment_status", "skipped")
+      .or("payment_status.neq.skipped,payment_status.is.null")
       .gte("transaction_date", startOfMonth)
       .lte("transaction_date", endOfMonth)
       .order("transaction_date", { ascending: false });

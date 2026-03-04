@@ -448,7 +448,7 @@ export default function DashboardPage() {
                 </span>
               </label>
               <Link
-                href={`${getMonthUrl("/transactions")}${hidePlanned ? "?hidePlanned=true" : ""}`}
+                href={`${getMonthUrl("/transactions")}${hidePlanned ? (getMonthUrl("/transactions").includes("?") ? "&hidePlanned=true" : "?hidePlanned=true") : ""}`}
                 className="text-emerald-600 hover:text-emerald-700 text-sm font-medium"
               >
                 Zobacz wszystkie
