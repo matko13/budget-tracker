@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     transactions
       ?.filter((t: { type: string; is_excluded?: boolean }) => t.type === "expense" && !t.is_excluded)
       .forEach((t: { categories?: { name: string; color: string }; amount: number }) => {
-        const categoryName = t.categories?.name || "Uncategorized";
+        const categoryName = t.categories?.name || "Bez kategorii";
         const categoryColor = t.categories?.color || "#94a3b8";
         
         if (!spendingByCategory[categoryName]) {

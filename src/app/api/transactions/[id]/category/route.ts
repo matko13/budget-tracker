@@ -30,10 +30,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
     }
 
-    // Update the category
+    // Update the category (normalize empty string to null)
     const { error: updateError } = await supabase
       .from("transactions")
-      .update({ category_id: categoryId })
+      .update({ category_id: categoryId || null })
       .eq("id", id);
 
     if (updateError) {

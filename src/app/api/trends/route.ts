@@ -99,7 +99,7 @@ export async function GET() {
     ((transactions || []) as any[])
       .filter((t) => t.type === "expense")
       .forEach((t) => {
-        const categoryName = t.categories?.name || "Uncategorized";
+        const categoryName = t.categories?.name || "Bez kategorii";
         const categoryColor = t.categories?.color || "#94a3b8";
 
         if (!categoryTrends[categoryName]) {
