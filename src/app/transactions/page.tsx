@@ -553,6 +553,7 @@ function TransactionsContent() {
                 className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent cursor-pointer"
               >
                 <option value="">Wszystkie kategorie</option>
+                <option value="uncategorized">Bez kategorii</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.icon} {category.name}

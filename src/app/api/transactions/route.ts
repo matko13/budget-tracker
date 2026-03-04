@@ -51,7 +51,9 @@ export async function GET(request: Request) {
       .neq("payment_status", "skipped");
 
     // Category filter
-    if (categoryId) {
+    if (categoryId === "uncategorized") {
+      query = query.is("category_id", null);
+    } else if (categoryId) {
       query = query.eq("category_id", categoryId);
     }
     
