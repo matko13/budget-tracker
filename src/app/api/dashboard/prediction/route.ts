@@ -42,27 +42,67 @@ export async function GET() {
       .gte("transaction_date", oldestStart)
       .lte("transaction_date", newestEnd);
 
-    const filtered = (historicalTransactions || []).filter(
-      (t: { is_excluded?: boolean }) => !t.is_excluded
+    const expenses = (historicalTransactions || []).filter(
+      (t: { type: string; is_excluded?: boolean }) =>
+        t.type === "expense" && !t.is_excluded
     );
 
-    const totalExpenses = filtered
-      .filter((t: { type: string }) => t.type === "expense")
-      .reduce((sum: number, t: { amount: number }) => sum + t.amount, 0);
-
     const monthsWithData = historicalMonths.filter((m) =>
-      filtered.some(
+      expenses.some(
         (t: { transaction_date: string }) =>
           t.transaction_date >= m.startDate && t.transaction_date <= m.endDate
       )
     );
 
     const monthsAnalyzed = monthsWithData.length;
-    const effectiveDays = monthsWithData.reduce((sum, m) => sum + m.days, 0);
+    if (monthsAnalyzed === 0) {
+      return NextResponse.json({
+        predictedRemainingExpenses: 0,
+        avgDailyExpense: 0,
+        remainingDays,
+        monthsAnalyzed: 0,
+      });
+    }
 
+    // Build per-day-of-month expense totals (day 1..31)
+    const dayTotals: Record<number, { sum: number; monthCount: number }> = {};
+    for (let d = 1; d <= 31; d++) {
+      dayTotals[d] = { sum: 0, monthCount: 0 };
+    }
+
+    for (const m of monthsWithData) {
+      for (let d = 1; d <= m.days; d++) {
+        dayTotals[d].monthCount++;
+      }
+    }
+
+    for (const t of expenses as { amount: number; transaction_date: string }[]) {
+      const inRange = monthsWithData.some(
+        (m) => t.transaction_date >= m.startDate && t.transaction_date <= m.endDate
+      );
+      if (!inRange) continue;
+      const day = parseInt(t.transaction_date.split("-")[2], 10);
+      dayTotals[day].sum += t.amount;
+    }
+
+    // Sum predicted expenses for each remaining day using per-day averages
+    let predictedRemainingExpenses = 0;
+    for (let d = currentDay + 1; d <= daysInMonth; d++) {
+      const entry = dayTotals[d];
+      if (entry && entry.monthCount > 0) {
+        predictedRemainingExpenses += entry.sum / entry.monthCount;
+      }
+    }
+
+    const totalExpenses = expenses.reduce(
+      (sum: number, t: { amount: number }) => sum + t.amount,
+      0
+    );
+    const effectiveDays = monthsWithData.reduce((sum, m) => sum + m.days, 0);
     const avgDailyExpense = effectiveDays > 0 ? totalExpenses / effectiveDays : 0;
 
     return NextResponse.json({
+      predictedRemainingExpenses: Math.round(predictedRemainingExpenses * 100) / 100,
       avgDailyExpense: Math.round(avgDailyExpense * 100) / 100,
       remainingDays,
       monthsAnalyzed,

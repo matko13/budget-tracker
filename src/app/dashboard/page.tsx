@@ -54,6 +54,7 @@ interface DashboardData {
 }
 
 interface PredictionData {
+  predictedRemainingExpenses: number;
   avgDailyExpense: number;
   remainingDays: number;
   monthsAnalyzed: number;
@@ -407,7 +408,7 @@ export default function DashboardPage() {
 
         {/* Predicted End-of-Month Balance */}
         {prediction && prediction.monthsAnalyzed > 0 && data?.isCurrentMonth && (() => {
-          const predictedEndBalance = (data?.realBalance || 0) - prediction.avgDailyExpense * prediction.remainingDays;
+          const predictedEndBalance = (data?.realBalance || 0) - prediction.predictedRemainingExpenses;
           return (
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm mb-6">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
