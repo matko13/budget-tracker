@@ -22,10 +22,11 @@ export async function timedFetch(
   });
   const durationMs = performance.now() - start;
   let body: unknown;
+  const text = await res.text();
   try {
-    body = await res.json();
+    body = JSON.parse(text);
   } catch {
-    body = await res.text().catch(() => null);
+    body = text;
   }
   return { status: res.status, body, durationMs, ok: res.ok };
 }
