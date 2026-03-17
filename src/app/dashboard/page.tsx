@@ -54,14 +54,8 @@ interface DashboardData {
 }
 
 interface PredictionData {
-  currentBalance: number;
-  predictedBalance: number;
   avgDailyExpense: number;
-  avgDailyIncome: number;
-  currentMonthDailyExpense: number;
   remainingDays: number;
-  daysInMonth: number;
-  currentDay: number;
   monthsAnalyzed: number;
 }
 
@@ -412,84 +406,38 @@ export default function DashboardPage() {
         </div>
 
         {/* Predicted End-of-Month Balance */}
-        {prediction && prediction.monthsAnalyzed > 0 && data?.isCurrentMonth && (
-          <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 bg-violet-100 dark:bg-violet-900/30 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-                  Prognoza na koniec miesiąca
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-500">
-                  Na podstawie średnich dziennych wydatków z {prediction.monthsAnalyzed} {prediction.monthsAnalyzed === 1 ? "miesiąca" : prediction.monthsAnalyzed < 5 ? "miesięcy" : "miesięcy"}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Obecny stan konta</p>
-                <p className={`text-xl font-bold ${prediction.currentBalance >= 0 ? "text-slate-900 dark:text-white" : "text-red-600"}`}>
-                  {formatCurrency(prediction.currentBalance)}
-                </p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Przewidywany stan</p>
-                <p className={`text-xl font-bold ${prediction.predictedBalance >= 0 ? "text-violet-600" : "text-red-600"}`}>
-                  {formatCurrency(prediction.predictedBalance)}
-                </p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Śr. dzienne wydatki</p>
-                <p className="text-xl font-bold text-slate-900 dark:text-white">
-                  {formatCurrency(prediction.avgDailyExpense)}
-                </p>
-                {prediction.currentMonthDailyExpense > 0 && (
-                  <p className={`text-xs mt-1 ${
-                    prediction.currentMonthDailyExpense > prediction.avgDailyExpense
-                      ? "text-red-500"
-                      : "text-emerald-500"
-                  }`}>
-                    Ten miesiąc: {formatCurrency(prediction.currentMonthDailyExpense)}/dzień
-                  </p>
-                )}
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Pozostało dni</p>
-                <p className="text-xl font-bold text-slate-900 dark:text-white">
-                  {prediction.remainingDays}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
-                  z {prediction.daysInMonth} w tym miesiącu
-                </p>
+        {prediction && prediction.monthsAnalyzed > 0 && data?.isCurrentMonth && (() => {
+          const predictedEndBalance = (data?.realBalance || 0) - prediction.avgDailyExpense * prediction.remainingDays;
+          return (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 bg-violet-100 dark:bg-violet-900/30 rounded-lg flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Prognoza bilansu na koniec miesiąca</p>
+                    <p className={`text-xl font-bold ${predictedEndBalance >= 0 ? "text-violet-600" : "text-red-600"}`}>
+                      {predictedEndBalance >= 0 ? "+" : ""}{formatCurrency(predictedEndBalance)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 sm:gap-6 text-xs text-slate-500 dark:text-slate-400 sm:ml-auto shrink-0">
+                  <span>Śr. wydatki: <span className="font-medium text-slate-700 dark:text-slate-300">{formatCurrency(prediction.avgDailyExpense)}</span>/dzień</span>
+                  <span>Pozostało: <span className="font-medium text-slate-700 dark:text-slate-300">{prediction.remainingDays} dni</span></span>
+                  <span className="hidden sm:inline" title={`Na podstawie ${prediction.monthsAnalyzed} mies. danych`}>
+                    <svg className="w-3.5 h-3.5 inline -mt-0.5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {prediction.monthsAnalyzed} mies.
+                  </span>
+                </div>
               </div>
             </div>
-
-            {/* Progress bar showing month progress */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Postęp miesiąca</span>
-                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                  {Math.round((prediction.currentDay / prediction.daysInMonth) * 100)}%
-                </span>
-              </div>
-              <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-violet-500 rounded-full transition-all"
-                  style={{ width: `${(prediction.currentDay / prediction.daysInMonth) * 100}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-slate-400 dark:text-slate-500">1</span>
-                <span className="text-xs text-slate-400 dark:text-slate-500">{prediction.daysInMonth}</span>
-              </div>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Spending by Category */}
         <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm mb-8">
