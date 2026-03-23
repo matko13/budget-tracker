@@ -85,7 +85,7 @@ export async function POST(request: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
 
-    const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     let content: string | null = null;
     let lastError: unknown = null;
 
