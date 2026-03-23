@@ -212,6 +212,7 @@ export default function AddTransactionModal({
           return;
         }
         setError(data.message || data.error || "Nie udało się odczytać screenshota");
+        setScreenshotPreview(null);
         return;
       }
 
@@ -223,6 +224,7 @@ export default function AddTransactionModal({
       if (tx.type === "income" || tx.type === "expense") setType(tx.type);
     } catch {
       setError("Nie udało się przetworzyć screenshota. Spróbuj ponownie.");
+      setScreenshotPreview(null);
     } finally {
       setScanningScreenshot(false);
     }
