@@ -175,7 +175,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: `Wystąpił błąd podczas przetwarzania screenshota: ${errMsg.substring(0, 200)}`,
+        error: "Wystąpił błąd podczas przetwarzania screenshota. Spróbuj ponownie.",
       },
       { status: 500 }
     );
