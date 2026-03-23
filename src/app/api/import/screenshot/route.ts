@@ -1,25 +1,25 @@
 import { NextResponse } from "next/server";
 import { createUntypedClient } from "@/lib/supabase/server-untyped";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const SYSTEM_PROMPT = `Jesteś asystentem do analizy screenshotów transakcji bankowych. Użytkownik prześle screenshot z aplikacji bankowej (np. ING, mBank, PKO, Santander, itp.) i Twoim zadaniem jest wydobyć dane transakcji.
+const PROMPT = `Przeanalizuj ten screenshot transakcji bankowej i wydobądź dane transakcji.
 
 Zwróć dane w formacie JSON z następującymi polami:
 - "amount": kwota transakcji jako liczba (zawsze wartość bezwzględna, bez znaku minus)
 - "description": tytuł/opis transakcji
-- "merchantName": nazwa odbiorcy/sprzedawcy (jeśli dostępna)
+- "merchantName": nazwa odbiorcy/sprzedawcy (jeśli dostępna, bez adresu)
 - "date": data transakcji w formacie YYYY-MM-DD
-- "type": "expense" jeśli to wydatek/płatność, "income" jeśli to przychód/wpływ
+- "type": "expense" jeśli to wydatek/płatność/blokada, "income" jeśli to przychód/wpływ
 - "currency": waluta (domyślnie "PLN")
 
 Zasady:
 - Jeśli widzisz kwotę z minusem lub słowa "blokada", "płatność kartą", "przelew wychodzący" - to wydatek
 - Jeśli widzisz kwotę z plusem lub słowa "wpływ", "przelew przychodzący", "wynagrodzenie" - to przychód
 - Wyciągnij datę transakcji (nie datę księgowania)
-- Jako merchantName podaj nazwę odbiorcy/nadawcy, nie pełny adres
+- Jako merchantName podaj nazwę odbiorcy/nadawcy (krótką, bez adresu)
 - Jako description podaj tytuł operacji
 
-Odpowiedz TYLKO obiektem JSON, bez żadnego dodatkowego tekstu.`;
+Odpowiedz TYLKO obiektem JSON, bez żadnego dodatkowego tekstu ani formatowania markdown.`;
 
 export async function POST(request: Request) {
   try {
@@ -32,19 +32,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error:
-            "Brak klucza API OpenAI. Dodaj OPENAI_API_KEY w ustawieniach aplikacji.",
-        },
-        { status: 500 }
-      );
-    }
-
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
+    const clientApiKey = formData.get("apiKey") as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -70,7 +60,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const maxSize = 20 * 1024 * 1024; // 20MB
+    const maxSize = 20 * 1024 * 1024;
     if (file.size > maxSize) {
       return NextResponse.json(
         { error: "Plik jest za duży. Maksymalny rozmiar to 20MB." },
@@ -78,35 +68,35 @@ export async function POST(request: Request) {
       );
     }
 
+    const apiKey = clientApiKey || process.env.GOOGLE_GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error: "NO_API_KEY",
+          message:
+            "Brak klucza API. Ustaw klucz Google Gemini w ustawieniach skanowania.",
+        },
+        { status: 400 }
+      );
+    }
+
     const bytes = await file.arrayBuffer();
     const base64 = Buffer.from(bytes).toString("base64");
-    const dataUrl = `data:${file.type};base64,${base64}`;
 
-    const openai = new OpenAI({ apiKey });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Przeanalizuj ten screenshot transakcji bankowej i wydobądź dane transakcji.",
-            },
-            {
-              type: "image_url",
-              image_url: { url: dataUrl, detail: "high" },
-            },
-          ],
+    const result = await model.generateContent([
+      PROMPT,
+      {
+        inlineData: {
+          mimeType: file.type,
+          data: base64,
         },
-      ],
-      max_tokens: 500,
-      temperature: 0,
-    });
+      },
+    ]);
 
-    const content = response.choices[0]?.message?.content;
+    const content = result.response.text();
     if (!content) {
       return NextResponse.json(
         { error: "Nie udało się przeanalizować obrazu" },
@@ -124,28 +114,44 @@ export async function POST(request: Request) {
     } catch {
       return NextResponse.json(
         {
-          error: "Nie udało się odczytać danych ze screenshota. Spróbuj ponownie z wyraźniejszym zdjęciem.",
+          error:
+            "Nie udało się odczytać danych ze screenshota. Spróbuj ponownie z wyraźniejszym zdjęciem.",
           rawResponse: content,
         },
         { status: 422 }
       );
     }
 
-    const result = {
+    return NextResponse.json({
       success: true,
       transaction: {
-        amount: typeof parsed.amount === "number" ? Math.abs(parsed.amount) : parseFloat(parsed.amount) || 0,
+        amount:
+          typeof parsed.amount === "number"
+            ? Math.abs(parsed.amount)
+            : parseFloat(parsed.amount) || 0,
         description: parsed.description || "",
         merchantName: parsed.merchantName || null,
         date: parsed.date || new Date().toISOString().split("T")[0],
         type: parsed.type === "income" ? "income" : "expense",
         currency: parsed.currency || "PLN",
       },
-    };
-
-    return NextResponse.json(result);
+    });
   } catch (error) {
     console.error("Error processing screenshot:", error);
+
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+
+    if (message.includes("API_KEY_INVALID") || message.includes("API key not valid")) {
+      return NextResponse.json(
+        {
+          error: "INVALID_API_KEY",
+          message: "Klucz API jest nieprawidłowy. Sprawdź go w ustawieniach.",
+        },
+        { status: 401 }
+      );
+    }
+
     return NextResponse.json(
       { error: "Wystąpił błąd podczas przetwarzania screenshota" },
       { status: 500 }

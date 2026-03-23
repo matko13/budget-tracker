@@ -73,6 +73,8 @@ export default function AddTransactionModal({
   // Screenshot state
   const [scanningScreenshot, setScanningScreenshot] = useState(false);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
   const screenshotInputRef = useRef<HTMLInputElement>(null);
   
   // Autocomplete state
@@ -120,6 +122,8 @@ export default function AddTransactionModal({
       // Reset screenshot state
       setScreenshotPreview(null);
       setScanningScreenshot(false);
+      setShowApiKeyInput(false);
+      setApiKeyInput("");
       // Reset autocomplete state
       setSuggestions([]);
       setShowSuggestions(false);
@@ -166,9 +170,18 @@ export default function AddTransactionModal({
   };
 
   // Screenshot scanning
+  const getStoredApiKey = () => {
+    try {
+      return localStorage.getItem("gemini_api_key") || "";
+    } catch {
+      return "";
+    }
+  };
+
   const handleScreenshot = async (file: File) => {
     setScanningScreenshot(true);
     setError(null);
+    setShowApiKeyInput(false);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -180,6 +193,11 @@ export default function AddTransactionModal({
       const formData = new FormData();
       formData.append("file", file);
 
+      const storedKey = getStoredApiKey();
+      if (storedKey) {
+        formData.append("apiKey", storedKey);
+      }
+
       const response = await fetch("/api/import/screenshot", {
         method: "POST",
         body: formData,
@@ -188,7 +206,12 @@ export default function AddTransactionModal({
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        setError(data.error || "Nie udało się odczytać screenshota");
+        if (data.error === "NO_API_KEY" || data.error === "INVALID_API_KEY") {
+          setShowApiKeyInput(true);
+          setError(null);
+          return;
+        }
+        setError(data.message || data.error || "Nie udało się odczytać screenshota");
         return;
       }
 
@@ -202,6 +225,30 @@ export default function AddTransactionModal({
       setError("Nie udało się przetworzyć screenshota. Spróbuj ponownie.");
     } finally {
       setScanningScreenshot(false);
+    }
+  };
+
+  const handleSaveApiKeyAndRetry = async () => {
+    const key = apiKeyInput.trim();
+    if (!key) return;
+
+    try {
+      localStorage.setItem("gemini_api_key", key);
+    } catch {
+      // localStorage not available
+    }
+
+    setShowApiKeyInput(false);
+    setApiKeyInput("");
+
+    const input = screenshotInputRef.current;
+    if (input?.files?.[0]) {
+      handleScreenshot(input.files[0]);
+    } else if (screenshotPreview) {
+      const response = await fetch(screenshotPreview);
+      const blob = await response.blob();
+      const file = new File([blob], "screenshot.jpg", { type: blob.type });
+      handleScreenshot(file);
     }
   };
 
@@ -443,13 +490,76 @@ export default function AddTransactionModal({
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleScreenshot(file);
-                  e.target.value = "";
                 }}
                 className="hidden"
               />
-              {scanningScreenshot ? (
+              {showApiKeyInput ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl space-y-3">
+                  <div className="flex items-start gap-3">
+                    {screenshotPreview && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={screenshotPreview}
+                        alt="Screenshot"
+                        className="w-10 h-10 object-cover rounded-lg shrink-0"
+                      />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        Potrzebny klucz Google Gemini
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Skanowanie wymaga darmowego klucza API.{" "}
+                        <a
+                          href="https://aistudio.google.com/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline font-medium hover:text-amber-800 dark:hover:text-amber-200"
+                        >
+                          Pobierz klucz za darmo
+                        </a>
+                        {" "}(bez karty kredytowej).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSaveApiKeyAndRetry();
+                        }
+                      }}
+                      placeholder="Wklej klucz API..."
+                      className="flex-1 px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveApiKeyAndRetry}
+                      disabled={!apiKeyInput.trim()}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
+                    >
+                      Zapisz
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowApiKeyInput(false);
+                      setScreenshotPreview(null);
+                    }}
+                    className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                  >
+                    Anuluj
+                  </button>
+                </div>
+              ) : scanningScreenshot ? (
                 <div className="flex items-center gap-3 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl">
                   {screenshotPreview && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={screenshotPreview}
                       alt="Screenshot"
@@ -470,6 +580,7 @@ export default function AddTransactionModal({
                 </div>
               ) : screenshotPreview ? (
                 <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={screenshotPreview}
                     alt="Screenshot"
