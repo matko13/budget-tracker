@@ -70,6 +70,13 @@ export default function AddTransactionModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Screenshot state
+  const [scanningScreenshot, setScanningScreenshot] = useState(false);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
+  
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<TransactionSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -112,6 +119,11 @@ export default function AddTransactionModal({
       setDescription("");
       setMerchantName("");
       setIsExcluded(false);
+      // Reset screenshot state
+      setScreenshotPreview(null);
+      setScanningScreenshot(false);
+      setShowApiKeyInput(false);
+      setApiKeyInput("");
       // Reset autocomplete state
       setSuggestions([]);
       setShowSuggestions(false);
@@ -154,6 +166,89 @@ export default function AddTransactionModal({
       }
     } catch (err) {
       console.error("Error fetching accounts:", err);
+    }
+  };
+
+  // Screenshot scanning
+  const getStoredApiKey = () => {
+    try {
+      return localStorage.getItem("gemini_api_key") || "";
+    } catch {
+      return "";
+    }
+  };
+
+  const handleScreenshot = async (file: File) => {
+    setScanningScreenshot(true);
+    setError(null);
+    setShowApiKeyInput(false);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setScreenshotPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const storedKey = getStoredApiKey();
+      if (storedKey) {
+        formData.append("apiKey", storedKey);
+      }
+
+      const response = await fetch("/api/import/screenshot", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        if (data.error === "NO_API_KEY" || data.error === "INVALID_API_KEY") {
+          setShowApiKeyInput(true);
+          setError(null);
+          return;
+        }
+        setError(data.message || data.error || "Nie udało się odczytać screenshota");
+        return;
+      }
+
+      const tx = data.transaction;
+      if (tx.amount) setAmount(tx.amount.toString());
+      if (tx.description) setDescription(tx.description);
+      if (tx.merchantName) setMerchantName(tx.merchantName);
+      if (tx.date) setDate(tx.date);
+      if (tx.type === "income" || tx.type === "expense") setType(tx.type);
+    } catch {
+      setError("Nie udało się przetworzyć screenshota. Spróbuj ponownie.");
+    } finally {
+      setScanningScreenshot(false);
+    }
+  };
+
+  const handleSaveApiKeyAndRetry = async () => {
+    const key = apiKeyInput.trim();
+    if (!key) return;
+
+    try {
+      localStorage.setItem("gemini_api_key", key);
+    } catch {
+      // localStorage not available
+    }
+
+    setShowApiKeyInput(false);
+    setApiKeyInput("");
+
+    const input = screenshotInputRef.current;
+    if (input?.files?.[0]) {
+      handleScreenshot(input.files[0]);
+    } else if (screenshotPreview) {
+      const response = await fetch(screenshotPreview);
+      const blob = await response.blob();
+      const file = new File([blob], "screenshot.jpg", { type: blob.type });
+      handleScreenshot(file);
     }
   };
 
@@ -339,6 +434,9 @@ export default function AddTransactionModal({
       setMerchantName("");
       setIsExcluded(false);
       setDate(new Date().toISOString().split("T")[0]);
+      // Reset screenshot state
+      setScreenshotPreview(null);
+      setScanningScreenshot(false);
       // Reset autocomplete state
       setSuggestions([]);
       setShowSuggestions(false);
@@ -378,6 +476,157 @@ export default function AddTransactionModal({
           {error && (
             <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
               <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+
+          {/* Screenshot Upload */}
+          {!isEditMode && (
+            <div>
+              <input
+                ref={screenshotInputRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleScreenshot(file);
+                }}
+                className="hidden"
+              />
+              {showApiKeyInput ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl space-y-3">
+                  <div className="flex items-start gap-3">
+                    {screenshotPreview && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={screenshotPreview}
+                        alt="Screenshot"
+                        className="w-10 h-10 object-cover rounded-lg shrink-0"
+                      />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                        Potrzebny klucz Google Gemini
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Skanowanie wymaga darmowego klucza API.{" "}
+                        <a
+                          href="https://aistudio.google.com/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline font-medium hover:text-amber-800 dark:hover:text-amber-200"
+                        >
+                          Pobierz klucz za darmo
+                        </a>
+                        {" "}(bez karty kredytowej).
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSaveApiKeyAndRetry();
+                        }
+                      }}
+                      placeholder="Wklej klucz API..."
+                      className="flex-1 px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveApiKeyAndRetry}
+                      disabled={!apiKeyInput.trim()}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white text-sm font-medium rounded-lg transition-colors shrink-0"
+                    >
+                      Zapisz
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowApiKeyInput(false);
+                      setScreenshotPreview(null);
+                    }}
+                    className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-400"
+                  >
+                    Anuluj
+                  </button>
+                </div>
+              ) : scanningScreenshot ? (
+                <div className="flex items-center gap-3 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-xl">
+                  {screenshotPreview && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={screenshotPreview}
+                      alt="Screenshot"
+                      className="w-12 h-12 object-cover rounded-lg shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-sm font-medium text-violet-700 dark:text-violet-300">
+                        Analizuję screenshot...
+                      </span>
+                    </div>
+                    <p className="text-xs text-violet-500 dark:text-violet-400 mt-1">
+                      Odczytywanie danych transakcji z obrazu
+                    </p>
+                  </div>
+                </div>
+              ) : screenshotPreview ? (
+                <div className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={screenshotPreview}
+                    alt="Screenshot"
+                    className="w-10 h-10 object-cover rounded-lg shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                      Dane odczytane ze screenshota
+                    </p>
+                    <p className="text-xs text-emerald-500 dark:text-emerald-400">
+                      Sprawdź i uzupełnij formularz poniżej
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScreenshotPreview(null);
+                      if (screenshotInputRef.current) screenshotInputRef.current.click();
+                    }}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-medium shrink-0"
+                  >
+                    Zmień
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => screenshotInputRef.current?.click()}
+                  className="w-full flex items-center gap-3 p-4 border-2 border-dashed border-violet-300 dark:border-violet-700 rounded-xl hover:border-violet-400 dark:hover:border-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/10 transition-colors group"
+                >
+                  <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900/30 rounded-lg flex items-center justify-center shrink-0 group-hover:bg-violet-200 dark:group-hover:bg-violet-900/50 transition-colors">
+                    <svg className="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-sm font-medium text-violet-700 dark:text-violet-300">
+                      Skanuj screenshot
+                    </span>
+                    <span className="block text-xs text-violet-500 dark:text-violet-400">
+                      Zrób zdjęcie lub wgraj screenshot transakcji
+                    </span>
+                  </div>
+                </button>
+              )}
             </div>
           )}
 
