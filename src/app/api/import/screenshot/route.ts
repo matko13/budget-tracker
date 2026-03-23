@@ -84,19 +84,34 @@ export async function POST(request: Request) {
     const base64 = Buffer.from(bytes).toString("base64");
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const result = await model.generateContent([
-      PROMPT,
-      {
-        inlineData: {
-          mimeType: file.type,
-          data: base64,
-        },
-      },
-    ]);
+    const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
+    let content: string | null = null;
+    let lastError: unknown = null;
 
-    const content = result.response.text();
+    for (const modelName of models) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent([
+          PROMPT,
+          {
+            inlineData: {
+              mimeType: file.type,
+              data: base64,
+            },
+          },
+        ]);
+        content = result.response.text();
+        break;
+      } catch (e) {
+        lastError = e;
+        console.error(`Model ${modelName} failed:`, e);
+      }
+    }
+
+    if (!content && lastError) {
+      throw lastError;
+    }
     if (!content) {
       return NextResponse.json(
         { error: "Nie udało się przeanalizować obrazu" },
@@ -155,10 +170,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (errMsg.includes("quota") || errMsg.includes("RATE_LIMIT") || errMsg.includes("429")) {
+    if (errMsg.includes("quota") || errMsg.includes("RATE_LIMIT") || errMsg.includes("429") || errMsg.includes("Resource has been exhausted")) {
       return NextResponse.json(
         {
-          error: "Przekroczono limit zapytań API. Spróbuj ponownie za chwilę.",
+          error: `Przekroczono limit zapytań API. Spróbuj ponownie za chwilę. (${errMsg.substring(0, 150)})`,
         },
         { status: 429 }
       );
