@@ -139,21 +139,44 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error processing screenshot:", error);
 
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
+    const errMsg = error instanceof Error ? error.message : String(error);
 
-    if (message.includes("API_KEY_INVALID") || message.includes("API key not valid")) {
+    if (
+      errMsg.includes("API_KEY_INVALID") ||
+      errMsg.includes("API key not valid") ||
+      errMsg.includes("API key expired")
+    ) {
       return NextResponse.json(
         {
           error: "INVALID_API_KEY",
-          message: "Klucz API jest nieprawidłowy. Sprawdź go w ustawieniach.",
+          message: "Klucz API jest nieprawidłowy lub wygasł. Sprawdź go w ustawieniach.",
         },
         { status: 401 }
       );
     }
 
+    if (errMsg.includes("quota") || errMsg.includes("RATE_LIMIT") || errMsg.includes("429")) {
+      return NextResponse.json(
+        {
+          error: "Przekroczono limit zapytań API. Spróbuj ponownie za chwilę.",
+        },
+        { status: 429 }
+      );
+    }
+
+    if (errMsg.includes("SAFETY") || errMsg.includes("blocked")) {
+      return NextResponse.json(
+        {
+          error: "Obraz został zablokowany przez filtr bezpieczeństwa. Spróbuj z innym screenshotem.",
+        },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas przetwarzania screenshota" },
+      {
+        error: `Wystąpił błąd podczas przetwarzania screenshota: ${errMsg.substring(0, 200)}`,
+      },
       { status: 500 }
     );
   }
