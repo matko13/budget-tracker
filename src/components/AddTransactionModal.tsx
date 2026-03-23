@@ -486,7 +486,6 @@ export default function AddTransactionModal({
                 ref={screenshotInputRef}
                 type="file"
                 accept="image/jpeg,image/jpg,image/png,image/webp"
-                capture="environment"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) handleScreenshot(file);
