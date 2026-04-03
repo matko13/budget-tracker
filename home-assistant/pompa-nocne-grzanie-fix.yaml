@@ -1,0 +1,88 @@
+# Pompa - nocne grzanie w taniej strefie
+# ======================================
+#
+# FIX: Usunięto warunek is_state('climate.pompa_zone_1', 'heat')
+#
+# PROBLEM:
+#   Integracja MELCloud dla pomp ATW (Ecodan) raportuje climate entity
+#   z hvac_modes: ['off'] - pompa nigdy nie jest w stanie 'heat'.
+#   To powodowało, że warunek:
+#     {{ current_temp != target and is_state('climate.pompa_zone_1', 'heat') }}
+#   był ZAWSZE fałszywy, więc automatyzacja nigdy nie zmieniała temperatury.
+#
+# ROZWIĄZANIE:
+#   Zamieniono warunek na:
+#     {{ current_temp != target and not is_state('climate.pompa_zone_1', 'unavailable') }}
+#   Teraz automatyzacja zmienia setpoint o ile pompa jest dostępna,
+#   niezależnie od stanu hvac. MELCloud Smart Energy może zarządzać
+#   włączaniem/wyłączaniem sprężarki - HA tylko ustawia setpoint.
+#
+# KOMPATYBILNOŚĆ Z MELCLOUD SMART ENERGY:
+#   Smart Energy w MELPump zarządza kiedy sprężarka pracuje na podstawie
+#   krzywej grzania i cen energii. Automatyzacja HA teraz tylko zmienia
+#   docelową temperaturę (setpoint) a nie tryb pracy pompy.
+#   Te dwa systemy mogą teraz współistnieć:
+#   - MELCloud Smart Energy: decyduje KIEDY grzać (włączenie sprężarki)
+#   - HA automatyzacja: decyduje DO JAKIEJ temperatury grzać (setpoint)
+
+id: "1774726746394"
+alias: "Pompa - nocne grzanie w taniej strefie"
+description: >
+  Grzej więcej nocą (tania taryfa), mniej w dzień.
+  Auto-wykrywanie ręcznych zmian.
+  Kompatybilne z MELCloud Smart Energy (nie wymaga stanu heat).
+
+triggers:
+  - trigger: time_pattern
+    minutes: "/5"
+  - trigger: time
+    at: "22:00:00"
+    id: reset_override
+
+conditions:
+  - condition: template
+    value_template: "{{ now().month in [1,2,3,4,10,11,12] }}"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: reset_override
+        sequence:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.pompa_zone_1
+            data:
+              temperature: 21.5
+
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+            state: "off"
+        sequence:
+          - variables:
+              hour: "{{ now().hour }}"
+              weekday: "{{ now().weekday() }}"
+              is_cheap: >
+                {{ (hour >= 22 or hour < 6) or
+                   (hour >= 13 and hour < 15 and weekday < 5 and now().month in [1,2,3,10,11,12]) or
+                   (hour >= 15 and hour < 17 and weekday < 5 and now().month in [4,5,6,7,8,9]) or
+                   (weekday >= 5) }}
+              current_temp: "{{ state_attr('climate.pompa_zone_1', 'temperature') | float }}"
+              target: "{{ 21.5 if is_cheap else 20.5 }}"
+
+          - condition: template
+            value_template: >
+              {{ current_temp != target and
+                 not is_state('climate.pompa_zone_1', 'unavailable') }}
+
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.pompa_zone_1
+            data:
+              temperature: "{{ target }}"
+
+mode: single
