@@ -1,40 +1,27 @@
 # Pompa - nocne grzanie w taniej strefie
 # ======================================
 #
-# FIX v2: Naprawiono logikę zmiennych Jinja2
-#
-# PROBLEM v1 (is_state heat):
-#   MELCloud ATW raportuje hvac_modes: ['off'], warunek is_state('heat')
-#   był zawsze fałszywy.
-#
-# PROBLEM v2 (Jinja2 string truthiness):
-#   Zmienne ustawiane przez 'variables:' w HA to stringi.
-#   "{{ 21.5 if is_cheap else 20.5 }}" - gdzie is_cheap = "False" (string)
-#   jest truthy w Jinja2 (niepusty string), więc target był ZAWSZE 21.5.
-#   Pompa grzała cały czas zamiast obniżać rano do 20.5°C.
-#
-# ROZWIĄZANIE v2:
-#   Rozbito logikę na osobne bloki variables z jawnym {% if %}{% endif %}
-#   zamiast inline ternary. Każdy warunek obliczany osobno, a na końcu
-#   {% if is_cheap %}21.5{% else %}20.5{% endif %} daje poprawny wynik
-#   bo Jinja2 poprawnie ocenia boolean z wcześniejszego template.
-#   Dodatkowo: porównanie przez | float na obu stronach.
+# v3: Dodano push notifications przy każdej zmianie setpointu
 #
 # HARMONOGRAM G12W:
-#   Tania taryfa (pozaszczyt) → setpoint 21.5°C (grzej):
+#   Pozaszczyt → setpoint 21.5°C (grzej):
 #   - 22:00 - 06:00 (noc)
 #   - 13:00 - 15:00 (zima, dni robocze)
 #   - 15:00 - 17:00 (lato, dni robocze)
 #   - cały weekend
 #
-#   Droga taryfa (szczyt) → setpoint 20.5°C (nie grzej):
+#   Szczyt → setpoint 20.5°C (nie grzej):
 #   - wszystkie inne godziny w dni robocze
+#
+# PUSH NOTIFICATIONS:
+#   - Przełączenie na pozaszczyt: "Pompa → tania taryfa"
+#   - Przełączenie na szczyt: "Pompa → oszczędzanie"
+#   - Reset o 22:00: "Pompa → tryb nocny"
 
 id: "1774726746394"
 alias: "Pompa - nocne grzanie w taniej strefie"
 description: >
   Grzej więcej nocą (tania taryfa G12W), mniej w dzień.
-  Auto-wykrywanie ręcznych zmian.
   Kompatybilne z MELCloud Smart Energy.
 
 triggers:
@@ -62,6 +49,13 @@ actions:
               entity_id: climate.pompa_zone_1
             data:
               temperature: 21.5
+          - action: notify.mobile_app_iphone_mateusz
+            data:
+              title: "🌙 Pompa → tryb nocny"
+              message: "22:00 → setpoint 21.5°C (tania taryfa). Override zresetowany."
+              data:
+                tag: pompa_heating
+                group: pompa
 
       - conditions:
           - condition: state
@@ -72,29 +66,34 @@ actions:
               hour: "{{ now().hour }}"
               weekday: "{{ now().weekday() }}"
               month: "{{ now().month }}"
-
           - variables:
               is_night_offpeak: "{{ hour | int >= 22 or hour | int < 6 }}"
               is_winter_midday_offpeak: "{{ hour | int >= 13 and hour | int < 15 and weekday | int < 5 and month | int in [1,2,3,10,11,12] }}"
               is_summer_midday_offpeak: "{{ hour | int >= 15 and hour | int < 17 and weekday | int < 5 and month | int in [4,5,6,7,8,9] }}"
               is_weekend: "{{ weekday | int >= 5 }}"
-
           - variables:
               is_cheap: "{{ is_night_offpeak or is_winter_midday_offpeak or is_summer_midday_offpeak or is_weekend }}"
               current_temp: "{{ state_attr('climate.pompa_zone_1', 'temperature') | float(0) }}"
-
           - variables:
               target: "{% if is_cheap %}21.5{% else %}20.5{% endif %}"
-
           - condition: template
             value_template: >
               {{ current_temp | float != target | float
                  and not is_state('climate.pompa_zone_1', 'unavailable') }}
-
           - action: climate.set_temperature
             target:
               entity_id: climate.pompa_zone_1
             data:
               temperature: "{{ target | float }}"
+          - action: notify.mobile_app_iphone_mateusz
+            data:
+              title: "{% if is_cheap %}💲 Pompa → tania taryfa{% else %}💰 Pompa → oszczędzanie{% endif %}"
+              message: >
+                Setpoint {{ current_temp }}°C → {{ target }}°C
+                {% if is_cheap %}(pozaszczyt G12W){% else %}(szczyt G12W - ograniczenie grzania){% endif %}.
+                Pokój {{ state_attr('climate.pompa_zone_1', 'current_temperature') }}°C.
+              data:
+                tag: pompa_heating
+                group: pompa
 
 mode: single
