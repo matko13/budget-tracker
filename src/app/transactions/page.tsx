@@ -6,6 +6,7 @@ import Link from "next/link";
 import AddTransactionModal from "@/components/AddTransactionModal";
 import ConvertToRecurringModal from "@/components/ConvertToRecurringModal";
 import BottomSheet, { BottomSheetAction } from "@/components/BottomSheet";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { useMonth } from "@/contexts/MonthContext";
 
 interface Category {
@@ -60,6 +61,7 @@ function TransactionsContent() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [convertToRecurringTransaction, setConvertToRecurringTransaction] = useState<Transaction | null>(null);
   const [bottomSheetTransaction, setBottomSheetTransaction] = useState<Transaction | null>(null);
+  const [deleteConfirmTransaction, setDeleteConfirmTransaction] = useState<Transaction | null>(null);
 
   // Read filters from URL params
   const page = parseInt(searchParams.get("page") || "1");
@@ -344,14 +346,19 @@ function TransactionsContent() {
   };
 
   const handleDeleteWithConfirm = (transaction: Transaction) => {
-    const isRecurring = transaction.is_recurring_generated;
-    const message = isRecurring
-      ? "Czy chcesz pominąć tę płatność cykliczną w tym miesiącu? Zostanie usunięta z listy i nie pojawi się ponownie."
-      : "Czy na pewno chcesz usunąć tę transakcję?";
+    setBottomSheetTransaction(null);
+    setDeleteConfirmTransaction(transaction);
+  };
 
-    if (!confirm(message)) return;
+  const handleConfirmDelete = () => {
+    if (deleteConfirmTransaction) {
+      handleDeleteTransaction(deleteConfirmTransaction.id);
+      setDeleteConfirmTransaction(null);
+    }
+  };
 
-    handleDeleteTransaction(transaction.id);
+  const handleCancelDelete = () => {
+    setDeleteConfirmTransaction(null);
   };
 
   const buildMobileActions = (transaction: Transaction): BottomSheetAction[] => {
@@ -1069,6 +1076,30 @@ function TransactionsContent() {
         title={bottomSheetTransaction?.merchant_name || bottomSheetTransaction?.description}
         subtitle={bottomSheetTransaction ? `${bottomSheetTransaction.type === "income" ? "+" : "-"}${formatCurrency(bottomSheetTransaction.amount, bottomSheetTransaction.currency)}` : undefined}
         actions={bottomSheetTransaction ? buildMobileActions(bottomSheetTransaction) : []}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirmTransaction !== null}
+        title={
+          deleteConfirmTransaction?.is_recurring_generated
+            ? "Pomiń płatność cykliczną"
+            : "Usuń transakcję"
+        }
+        message={
+          deleteConfirmTransaction?.is_recurring_generated
+            ? "Czy chcesz pominąć tę płatność cykliczną w tym miesiącu? Zostanie usunięta z listy i nie pojawi się ponownie."
+            : "Czy na pewno chcesz usunąć tę transakcję? Tej operacji nie można cofnąć."
+        }
+        confirmLabel={
+          deleteConfirmTransaction?.is_recurring_generated
+            ? "Pomiń"
+            : "Usuń"
+        }
+        cancelLabel="Anuluj"
+        variant="danger"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
       />
     </div>
   );
