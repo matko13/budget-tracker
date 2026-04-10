@@ -1,0 +1,67 @@
+# Pompa - wykryj ręczną zmianę temperatury
+# ==========================================
+#
+# FIX: Dodano rozróżnianie źródła zmiany temperatury (context)
+#
+# PROBLEM:
+#   Gdy MELCloud Smart Energy wyłączał pompę na 3 najdroższe godziny
+#   (zazwyczaj 20-22), zmiana stanu/temperatury encji climate.pompa_zone_1
+#   była wykrywana jako "ręczna zmiana". Override włączał się,
+#   blokując automatyzację nocnego grzania.
+#   Następnie o 22:00 nocne grzanie resetowało override i ustawiało 21.5°C,
+#   co znowu było wykrywane jako ręczna zmiana - powstało koło błędów.
+#
+# ROZWIĄZANIE:
+#   Użyto sprawdzenia context z triggera:
+#     {{ trigger.to_state.context.user_id is not none
+#        and trigger.to_state.context.parent_id is none }}
+#
+#   Logika:
+#   - user_id is not none → zmiana pochodzi od użytkownika (GUI/app)
+#   - parent_id is none → zmiana nie jest wywołana przez inną automatyzację
+#
+#   Zmiany z MELCloud API i automatyzacji HA mają:
+#   - user_id = none (zmiana systemowa/chmurowa)
+#   - parent_id != none (zmiana z automatyzacji)
+#
+#   Dzięki temu tylko PRAWDZIWE ręczne zmiany (np. z aplikacji HA)
+#   włączają override.
+
+id: "1774887592073"
+alias: "Pompa - wykryj ręczną zmianę temperatury"
+description: >
+  Automatycznie włącz override gdy ktoś ręcznie zmieni temperaturę.
+  Ignoruje zmiany z automatyzacji HA i MELCloud Smart Energy.
+
+triggers:
+  - trigger: state
+    entity_id: climate.pompa_zone_1
+    attribute: temperature
+
+conditions:
+  - condition: state
+    entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+    state: "off"
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.context.user_id is not none
+         and trigger.to_state.context.parent_id is none }}
+
+actions:
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+  - action: notify.mobile_app_iphone_mateusz
+    data:
+      title: "🖐️ Override ogrzewania"
+      message: >
+        Ręczna zmiana wykryta ({{ state_attr('climate.pompa_zone_1', 'temperature') }}°C).
+        Automatyzacja wstrzymana do 22:00.
+  - action: notify.persistent_notification
+    data:
+      message: >
+        🖐️ Ręczna zmiana ogrzewania wykryta
+        ({{ state_attr('climate.pompa_zone_1', 'temperature') }}°C).
+        Automatyzacja wstrzymana do 22:00.
+
+mode: single

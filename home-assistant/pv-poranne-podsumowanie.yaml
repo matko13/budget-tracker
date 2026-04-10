@@ -1,0 +1,81 @@
+# PV - poranne podsumowanie dnia
+# ================================
+#
+# Codziennie o 7:00 rano wysyła push notification na iPhone z podsumowaniem
+# wczorajszej pracy instalacji fotowoltaicznej, baterii i kosztów energii.
+#
+# Dane pobierane z helperów input_number.wczoraj_* (zapisywanych o 23:59
+# przez automatyzację "Zapisz dane dnia na wczoraj").
+#
+# Zawartość powiadomienia:
+#   - Ile zaoszczędzono (PLN)
+#   - Ile kosztowałoby bez PV i magazynu (PLN)
+#   - Produkcja PV (kWh)
+#   - Zużycie domu (kWh)
+#   - Przepływ: PV→dom, PV→bateria
+#   - Bateria: ładowanie/rozładowanie + aktualny SOC
+#   - Import/eksport z sieci + koszt
+#   - Pompa ciepła: zużycie + COP
+#   - Samowystarczalność (%)
+#   - Prognoza PV na dziś (kWh)
+
+id: "pv_morning_summary"
+alias: "PV - poranne podsumowanie dnia"
+description: >
+  Codziennie rano wysyła push z podsumowaniem wczorajszej pracy PV,
+  baterii i kosztów energii.
+
+triggers:
+  - trigger: time
+    at: "07:00:00"
+
+conditions: []
+
+actions:
+  - variables:
+      produkcja: "{{ states('input_number.wczoraj_produkcja_pv') | float(0) }}"
+      zuzycie: "{{ states('input_number.wczoraj_zuzycie_domu') | float(0) }}"
+      pv_dom: "{{ states('input_number.wczoraj_pv_dom') | float(0) }}"
+      pv_bat: "{{ states('input_number.wczoraj_pv_bateria') | float(0) }}"
+      eksport: "{{ states('input_number.wczoraj_eksport_do_sieci') | float(0) }}"
+      import_kwh: "{{ states('input_number.wczoraj_import_z_sieci') | float(0) }}"
+      koszt_import: "{{ states('input_number.wczoraj_koszt_importu') | float(0) }}"
+      oszczednosc: "{{ states('input_number.wczoraj_oszczednosc') | float(0) }}"
+      koszt_bez_pv: "{{ states('input_number.wczoraj_koszt_bez_pv_i_mag') | float(0) }}"
+      samow: "{{ states('input_number.wczoraj_samowystarczalnosc') | float(0) }}"
+      naladowano: "{{ states('input_number.wczoraj_naladowano') | float(0) }}"
+      rozladowano: "{{ states('input_number.wczoraj_rozladowano') | float(0) }}"
+      bat_soc: "{{ states('sensor.inverter_battery') | float(0) }}"
+      cop_wczoraj: "{{ states('sensor.pompa_wczoraj_cop') }}"
+      pompa_kwh: "{{ states('sensor.pompa_wczoraj_energia') | float(0) }}"
+      prognoza_dzis: "{{ states('sensor.energy_production_today') | float(0) }}"
+
+  - action: notify.mobile_app_iphone_mateusz
+    data:
+      title: "☀️ Raport PV — wczoraj"
+      message: >
+        💰 Oszczędność: {{ oszczednosc }} PLN
+        (bez PV kosztowałoby {{ koszt_bez_pv }} PLN)
+
+        ⚡ Produkcja PV: {{ produkcja }} kWh
+
+        🏠 Zużycie domu: {{ zuzycie }} kWh
+
+        🌞 PV → dom: {{ pv_dom }} kWh | PV → bat: {{ pv_bat }} kWh
+
+        🔋 Bat: +{{ naladowano }}/-{{ rozladowano }} kWh (teraz {{ bat_soc }}%)
+
+        🌐 Import: {{ import_kwh }} kWh ({{ koszt_import }} PLN) | Eksport: {{ eksport }} kWh
+
+        🌡️ Pompa: {{ pompa_kwh }} kWh, COP {{ cop_wczoraj }}
+
+        ✅ Samowystarczalność: {{ samow }}%
+
+        🔮 Prognoza dziś: {{ prognoza_dzis }} kWh
+      data:
+        push:
+          sound: default
+          interruption-level: passive
+        group: pv-daily-report
+
+mode: single
