@@ -1,0 +1,68 @@
+# ============================================
+# WhatsApp via CallMeBot - konfiguracja HA
+# ============================================
+#
+# SETUP:
+# 1. Wyślij WhatsApp na +34 644 71 81 45 z treścią:
+#    "I allow callmebot to send me messages"
+# 2. Otrzymasz zwrotną wiadomość z Twoim API key
+# 3. Wpisz numer telefonu i API key w secrets.yaml
+#
+# Dodaj poniższe sekcje do swojego configuration.yaml w HA.
+# ============================================
+
+# --- rest_command (dodaj do istniejącej sekcji) ---
+rest_command:
+  whatsapp_message:
+    url: "https://api.callmebot.com/whatsapp.php?phone={{ phone }}&text={{ message | urlencode }}&apikey={{ apikey }}"
+    method: GET
+
+# --- notify (alternatywna metoda - shell_command) ---
+shell_command:
+  whatsapp_notify: >
+    curl -s -X GET "https://api.callmebot.com/whatsapp.php?phone={{ phone }}&text={{ message | urlencode }}&apikey={{ apikey }}"
+
+# --- input_text (do konfiguracji w UI) ---
+input_text:
+  whatsapp_phone:
+    name: "WhatsApp - numer telefonu"
+    initial: !secret whatsapp_phone
+    mode: text
+  whatsapp_apikey:
+    name: "WhatsApp - API Key"
+    initial: !secret whatsapp_apikey
+    mode: password
+
+# --- script (reusable notification helper) ---
+script:
+  whatsapp_notify:
+    alias: "WhatsApp - wyślij wiadomość"
+    description: "Wysyła wiadomość WhatsApp przez CallMeBot"
+    fields:
+      message:
+        description: "Treść wiadomości"
+        example: "Test z Home Assistant"
+    sequence:
+      - action: rest_command.whatsapp_message
+        data:
+          phone: !secret whatsapp_phone
+          apikey: !secret whatsapp_apikey
+          message: "{{ message }}"
+    mode: queued
+    max: 10
+
+  whatsapp_notify_with_delay:
+    alias: "WhatsApp - wyślij z opóźnieniem (rate limit)"
+    description: "Wysyła wiadomość z 5s opóźnieniem (CallMeBot limit: 1 msg/5s)"
+    fields:
+      message:
+        description: "Treść wiadomości"
+        example: "Test z Home Assistant"
+    sequence:
+      - delay:
+          seconds: 5
+      - action: script.whatsapp_notify
+        data:
+          message: "{{ message }}"
+    mode: queued
+    max: 10

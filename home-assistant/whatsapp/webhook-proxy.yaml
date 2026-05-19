@@ -1,0 +1,57 @@
+# Webhook proxy - alternatywna metoda wysyłania WhatsApp
+# ========================================================
+#
+# Zamiast wywoływać CallMeBot bezpośrednio z HA, możesz użyć
+# webhooków przez swoją aplikację Next.js. Zalety:
+#   - Centralne logowanie powiadomień
+#   - Możliwość dodania kolejki (CallMeBot limit 1 msg/5s)
+#   - Łatwa zmiana dostawcy (Twilio, Meta API) bez edycji HA
+#   - Dodatkowe formatowanie wiadomości server-side
+#
+# KONFIGURACJA:
+# 1. Ustaw env vars w Vercel/hosting:
+#    - HA_WEBHOOK_SECRET=twój-losowy-secret
+#    - WHATSAPP_PHONE=48XXXXXXXXX
+#    - WHATSAPP_APIKEY=key-z-callmebot
+#
+# 2. W secrets.yaml HA:
+#    budget_app_webhook_url: "https://twoja-domena.vercel.app/api/home-assistant/webhook"
+#    budget_app_webhook_secret: "ten-sam-secret-co-HA_WEBHOOK_SECRET"
+#
+# WYMAGANE W HA configuration.yaml:
+#   rest_command:
+#     whatsapp_via_webhook:
+#       url: !secret budget_app_webhook_url
+#       method: POST
+#       headers:
+#         Authorization: "Bearer {{ secret }}"
+#         Content-Type: "application/json"
+#       payload: '{"title":"{{ title }}","message":"{{ message }}","device":"{{ device }}"}'
+
+# Script do użycia zamiast script.whatsapp_notify:
+id: "script_whatsapp_webhook"
+alias: "WhatsApp via Webhook"
+description: "Wysyła WhatsApp przez webhook Next.js (z kolejką i logowaniem)"
+
+# --- dodaj do scripts.yaml ---
+# whatsapp_webhook:
+#   alias: "WhatsApp via Webhook"
+#   fields:
+#     title:
+#       description: "Tytuł wiadomości (bold)"
+#       example: "☀️ Raport PV"
+#     message:
+#       description: "Treść wiadomości"
+#       example: "Produkcja: 15.3 kWh"
+#     device:
+#       description: "Nazwa urządzenia/źródła"
+#       example: "Home Assistant"
+#   sequence:
+#     - action: rest_command.whatsapp_via_webhook
+#       data:
+#         secret: !secret budget_app_webhook_secret
+#         title: "{{ title | default('') }}"
+#         message: "{{ message }}"
+#         device: "{{ device | default('Home Assistant') }}"
+#   mode: queued
+#   max: 20

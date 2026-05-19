@@ -1,0 +1,130 @@
+# System - ogólne alerty WhatsApp
+# ==================================
+#
+# Powiadomienia systemowe:
+# 1. Home Assistant start/restart
+# 2. Aktualizacja HA dostępna
+# 3. Wysoki import energii (rachunek rośnie!)
+# 4. Podsumowanie tygodniowe (niedziela)
+#
+# WYMAGANE ENCJE:
+#   - sensor.weekly_energy_cost (lub kalkulowany z utility_meter)
+#   - sensor.grid_import_power
+#   - sensor.home_assistant_version / update.home_assistant_core_update
+#   - script.whatsapp_notify
+
+id: "system_whatsapp_ha_start"
+alias: "System - HA uruchomiony WhatsApp"
+description: "Powiadamia o restarcie Home Assistant"
+
+triggers:
+  - trigger: homeassistant
+    event: start
+
+conditions: []
+
+actions:
+  - delay:
+      seconds: 60
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🏠 *Home Assistant uruchomiony*
+
+        Wersja: {{ states('sensor.current_version') | default('?') }}
+        Czas startu: {{ now().strftime('%H:%M') }}
+
+mode: single
+---
+id: "system_whatsapp_ha_update"
+alias: "System - aktualizacja HA WhatsApp"
+description: "Powiadamia o dostępnej aktualizacji"
+
+triggers:
+  - trigger: state
+    entity_id: update.home_assistant_core_update
+    to: "on"
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🆕 *Aktualizacja Home Assistant*
+
+        Nowa wersja: {{ state_attr('update.home_assistant_core_update', 'latest_version') }}
+        Aktualna: {{ state_attr('update.home_assistant_core_update', 'installed_version') }}
+
+        Zainstaluj w Settings → System → Updates
+
+mode: single
+---
+id: "system_whatsapp_high_import"
+alias: "System - wysoki import energii WhatsApp"
+description: "Alert gdy dom pobiera dużo energii z sieci"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.grid_import_power
+    above: 5000
+    for:
+      minutes: 30
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ now().hour >= 6 and now().hour <= 22 }}
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        ⚡ *Wysoki import z sieci!*
+
+        Aktualne zużycie: {{ states('sensor.grid_import_power') }}W (>5kW od 30min)
+        Bateria: {{ states('sensor.inverter_battery') }}%
+
+        Duże odbiorniki aktywne - rachunek rośnie.
+        {% if is_state('vacuum.robot', 'cleaning') %}🤖 Robot sprząta
+        {% endif %}
+
+mode: single
+---
+id: "system_whatsapp_weekly_summary"
+alias: "System - podsumowanie tygodniowe WhatsApp"
+description: "Niedzielne podsumowanie zużycia energii"
+
+triggers:
+  - trigger: time
+    at: "20:00:00"
+
+conditions:
+  - condition: time
+    weekday:
+      - sun
+
+actions:
+  - variables:
+      weekly_import: "{{ states('sensor.weekly_grid_import') | float(0) | round(1) }}"
+      weekly_export: "{{ states('sensor.weekly_grid_export') | float(0) | round(1) }}"
+      weekly_production: "{{ states('sensor.weekly_pv_production') | float(0) | round(1) }}"
+      weekly_consumption: "{{ states('sensor.weekly_home_consumption') | float(0) | round(1) }}"
+      weekly_cost: "{{ states('sensor.weekly_energy_cost') | float(0) | round(2) }}"
+      avg_cop: "{{ states('sensor.weekly_avg_cop') | float(0) | round(1) }}"
+
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        📊 *Podsumowanie tygodnia*
+
+        ⚡ Produkcja PV: {{ weekly_production }} kWh
+        🏠 Zużycie: {{ weekly_consumption }} kWh
+        🌐 Import: {{ weekly_import }} kWh
+        📤 Eksport: {{ weekly_export }} kWh
+        💰 Koszt netto: {{ weekly_cost }} PLN
+        🌡️ Śr. COP pompy: {{ avg_cop }}
+
+        Bilans: {% if weekly_export > weekly_import %}✅ nadwyżka{% else %}📉 deficyt{% endif %}
+
+mode: single

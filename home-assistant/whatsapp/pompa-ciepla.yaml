@@ -1,0 +1,215 @@
+# Pompa ciepła - powiadomienia WhatsApp
+# ========================================
+#
+# Zestaw powiadomień o pracy pompy ciepła:
+# 1. Zmiana taryfy (szczyt/pozaszczyt G12W) - setpoint update
+# 2. Reset trybu nocnego (22:00)
+# 3. CWU gotowe (podgrzewanie zakończone)
+# 4. Niski COP - pompa pracuje nieefektywnie
+# 5. Pompa niedostępna (offline)
+#
+# WYMAGANE ENCJE:
+#   - climate.pompa_zone_1
+#   - input_boolean.reczne_sterowanie_ogrzewaniem
+#   - sensor.pompa_cop (aktualny COP)
+#   - sensor.cwu_temperature / water_heater.pompa_cwu
+#   - script.whatsapp_notify
+
+id: "pompa_whatsapp_tariff_change"
+alias: "Pompa - zmiana taryfy WhatsApp"
+description: >
+  Informuje o przełączeniu pompy między taryfą szczytową i pozaszczytową.
+
+triggers:
+  - trigger: time_pattern
+    minutes: "/5"
+
+conditions:
+  - condition: template
+    value_template: "{{ now().month in [1,2,3,4,10,11,12] }}"
+  - condition: state
+    entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+    state: "off"
+
+actions:
+  - variables:
+      hour: "{{ now().hour }}"
+      weekday: "{{ now().weekday() }}"
+      month: "{{ now().month }}"
+  - variables:
+      is_night_offpeak: "{{ hour | int >= 22 or hour | int < 6 }}"
+      is_winter_midday_offpeak: "{{ hour | int >= 13 and hour | int < 15 and weekday | int < 5 and month | int in [1,2,3,10,11,12] }}"
+      is_summer_midday_offpeak: "{{ hour | int >= 15 and hour | int < 17 and weekday | int < 5 and month | int in [4,5,6,7,8,9] }}"
+      is_weekend: "{{ weekday | int >= 5 }}"
+  - variables:
+      is_cheap: "{{ is_night_offpeak or is_winter_midday_offpeak or is_summer_midday_offpeak or is_weekend }}"
+      current_temp: "{{ state_attr('climate.pompa_zone_1', 'temperature') | float(0) }}"
+  - variables:
+      target: "{% if is_cheap %}21.5{% else %}20.5{% endif %}"
+  - condition: template
+    value_template: >
+      {{ current_temp | float != target | float
+         and not is_state('climate.pompa_zone_1', 'unavailable') }}
+  - action: climate.set_temperature
+    target:
+      entity_id: climate.pompa_zone_1
+    data:
+      temperature: "{{ target | float }}"
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        {% if is_cheap %}💲 *Pompa → tania taryfa*{% else %}💰 *Pompa → oszczędzanie*{% endif %}
+
+        Setpoint: {{ current_temp }}°C → {{ target }}°C
+        {% if is_cheap %}(pozaszczyt G12W){% else %}(szczyt - ograniczenie){% endif %}
+        Pokój: {{ state_attr('climate.pompa_zone_1', 'current_temperature') }}°C
+
+mode: single
+---
+id: "pompa_whatsapp_night_reset"
+alias: "Pompa - reset nocny WhatsApp"
+description: "O 22:00 resetuje override i informuje o trybie nocnym"
+
+triggers:
+  - trigger: time
+    at: "22:00:00"
+
+conditions:
+  - condition: template
+    value_template: "{{ now().month in [1,2,3,4,10,11,12] }}"
+
+actions:
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+  - action: climate.set_temperature
+    target:
+      entity_id: climate.pompa_zone_1
+    data:
+      temperature: 21.5
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🌙 *Pompa → tryb nocny*
+
+        22:00 - setpoint 21.5°C (tania taryfa)
+        Override zresetowany.
+        Pokój: {{ state_attr('climate.pompa_zone_1', 'current_temperature') }}°C
+
+mode: single
+---
+id: "pompa_whatsapp_manual_override"
+alias: "Pompa - override ręczny WhatsApp"
+description: "Informuje o ręcznej zmianie temperatury"
+
+triggers:
+  - trigger: state
+    entity_id: climate.pompa_zone_1
+    attribute: temperature
+
+conditions:
+  - condition: state
+    entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+    state: "off"
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.context.user_id is not none
+         and trigger.to_state.context.parent_id is none }}
+
+actions:
+  - action: input_boolean.turn_on
+    target:
+      entity_id: input_boolean.reczne_sterowanie_ogrzewaniem
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🖐️ *Override ogrzewania*
+
+        Ręczna zmiana: {{ state_attr('climate.pompa_zone_1', 'temperature') }}°C
+        Automatyzacja wstrzymana do 22:00.
+
+mode: single
+---
+id: "pompa_whatsapp_cwu_ready"
+alias: "Pompa - CWU gotowe WhatsApp"
+description: "Powiadamia gdy ciepła woda jest podgrzana"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.cwu_temperature
+    above: 48
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ as_timestamp(now()) - as_timestamp(states.sensor.cwu_temperature.last_changed) < 300 }}
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🚿 *CWU gotowe!*
+
+        Temperatura: {{ states('sensor.cwu_temperature') }}°C
+        Ciepła woda podgrzana.
+
+mode: single
+---
+id: "pompa_whatsapp_low_cop"
+alias: "Pompa - niski COP WhatsApp"
+description: "Alert gdy COP spada poniżej 2.0 (nieefektywna praca)"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.pompa_cop
+    below: 2.0
+    for:
+      hours: 2
+
+conditions:
+  - condition: template
+    value_template: "{{ now().month in [1,2,3,11,12] }}"
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        ⚠️ *Pompa - niski COP!*
+
+        COP: {{ states('sensor.pompa_cop') }} (poniżej 2.0 od 2h)
+
+        Możliwe przyczyny:
+        • Bardzo niska temp. zewnętrzna
+        • Zatkany filtr
+        • Problem z czynnikiem
+
+        Sprawdź temperaturę zewn.: {{ states('sensor.outdoor_temperature') }}°C
+
+mode: single
+---
+id: "pompa_whatsapp_offline"
+alias: "Pompa - offline WhatsApp"
+description: "Alert gdy pompa jest niedostępna"
+
+triggers:
+  - trigger: state
+    entity_id: climate.pompa_zone_1
+    to: "unavailable"
+    for:
+      minutes: 30
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🚨 *Pompa ciepła OFFLINE!*
+
+        Brak komunikacji od 30 minut.
+        Sprawdź:
+        • Zasilanie pompy
+        • Połączenie MELCloud
+        • Bezpieczniki
+
+mode: single

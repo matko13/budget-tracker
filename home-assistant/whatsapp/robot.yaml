@@ -1,0 +1,147 @@
+# Robot sprzątający - powiadomienia WhatsApp
+# =============================================
+#
+# Powiadomienia o statusie robota:
+# 1. Rozpoczęcie sprzątania
+# 2. Zakończenie sprzątania (z czasem i powierzchnią)
+# 3. Błąd / zablokowany
+# 4. Pojemnik pełny
+# 5. Powrót do bazy
+#
+# WYMAGANE ENCJE (dostosuj do modelu robota):
+#   - vacuum.robot (główna encja)
+#   - sensor.robot_battery (bateria %)
+#   - sensor.robot_cleaning_area (m² w ostatnim cyklu)
+#   - sensor.robot_cleaning_time (czas w min)
+#   - sensor.robot_filter_life / sensor.robot_brush_life
+#   - script.whatsapp_notify
+#
+# UWAGA: Nazwy encji zależą od integracji (Roborock, Xiaomi, Dreame, iRobot).
+# Dostosuj entity_id do swojego robota.
+
+id: "robot_whatsapp_started"
+alias: "Robot - rozpoczął sprzątanie WhatsApp"
+description: "Powiadamia o rozpoczęciu sprzątania"
+
+triggers:
+  - trigger: state
+    entity_id: vacuum.robot
+    from: "docked"
+    to: "cleaning"
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🤖 *Robot rozpoczął sprzątanie*
+
+        Bateria: {{ state_attr('vacuum.robot', 'battery_level') }}%
+        Tryb: {{ state_attr('vacuum.robot', 'fan_speed') | default('standard') }}
+
+mode: single
+---
+id: "robot_whatsapp_finished"
+alias: "Robot - zakończył sprzątanie WhatsApp"
+description: "Powiadamia o zakończeniu sprzątania z podsumowaniem"
+
+triggers:
+  - trigger: state
+    entity_id: vacuum.robot
+    to: "returning"
+
+conditions: []
+
+actions:
+  - delay:
+      seconds: 10
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        ✅ *Robot zakończył sprzątanie!*
+
+        ⏱️ Czas: {{ states('sensor.robot_cleaning_time') | default('?') }} min
+        📐 Powierzchnia: {{ states('sensor.robot_cleaning_area') | default('?') }} m²
+        🔋 Bateria: {{ state_attr('vacuum.robot', 'battery_level') }}%
+
+mode: single
+---
+id: "robot_whatsapp_error"
+alias: "Robot - błąd WhatsApp"
+description: "Powiadamia o błędzie robota (zablokowany, utknął)"
+
+triggers:
+  - trigger: state
+    entity_id: vacuum.robot
+    to: "error"
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🚨 *Robot - BŁĄD!*
+
+        Status: {{ states('vacuum.robot') }}
+        {{ state_attr('vacuum.robot', 'status') | default('') }}
+
+        Sprawdź czy robot nie utknął lub nie jest zablokowany.
+
+mode: single
+---
+id: "robot_whatsapp_dustbin_full"
+alias: "Robot - pojemnik pełny WhatsApp"
+description: "Powiadamia gdy pojemnik na kurz jest pełny"
+
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.robot_dustbin_full
+    to: "on"
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🗑️ *Robot - opróżnij pojemnik!*
+
+        Pojemnik na kurz jest pełny.
+        Opróżnij przed następnym sprzątaniem.
+
+mode: single
+---
+id: "robot_whatsapp_maintenance"
+alias: "Robot - przegląd części WhatsApp"
+description: "Raz w tygodniu sprawdza żywotność filtra/szczotki"
+
+triggers:
+  - trigger: time
+    at: "09:00:00"
+
+conditions:
+  - condition: time
+    weekday:
+      - mon
+
+actions:
+  - variables:
+      filter_life: "{{ states('sensor.robot_filter_life') | float(100) }}"
+      brush_life: "{{ states('sensor.robot_brush_life') | float(100) }}"
+      side_brush: "{{ states('sensor.robot_side_brush_life') | float(100) }}"
+  - condition: template
+    value_template: >
+      {{ filter_life < 20 or brush_life < 20 or side_brush < 20 }}
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🔧 *Robot - przegląd części*
+
+        {% if filter_life < 20 %}⚠️ Filtr: {{ filter_life }}% (wymień!)
+        {% endif %}{% if brush_life < 20 %}⚠️ Szczotka: {{ brush_life }}% (wymień!)
+        {% endif %}{% if side_brush < 20 %}⚠️ Szczotka boczna: {{ side_brush }}% (wymień!)
+        {% endif %}
+
+mode: single

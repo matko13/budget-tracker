@@ -1,0 +1,79 @@
+# PV - dzienny raport WhatsApp
+# ================================
+#
+# Codziennie o 7:00 wysyła WhatsApp z podsumowaniem wczorajszej pracy PV.
+# Używa tych samych helperów input_number.wczoraj_* co push notification.
+#
+# WYMAGANE ENCJE:
+#   - input_number.wczoraj_produkcja_pv
+#   - input_number.wczoraj_zuzycie_domu
+#   - input_number.wczoraj_pv_dom
+#   - input_number.wczoraj_pv_bateria
+#   - input_number.wczoraj_eksport_do_sieci
+#   - input_number.wczoraj_import_z_sieci
+#   - input_number.wczoraj_koszt_importu
+#   - input_number.wczoraj_oszczednosc
+#   - input_number.wczoraj_koszt_bez_pv_i_mag
+#   - input_number.wczoraj_samowystarczalnosc
+#   - input_number.wczoraj_naladowano
+#   - input_number.wczoraj_rozladowano
+#   - sensor.inverter_battery
+#   - sensor.pompa_wczoraj_cop
+#   - sensor.pompa_wczoraj_energia
+#   - sensor.energy_production_today (prognoza)
+#   - script.whatsapp_notify
+
+id: "pv_whatsapp_daily_report"
+alias: "PV - dzienny raport WhatsApp"
+description: >
+  Codziennie rano o 7:00 wysyła WhatsApp z podsumowaniem wczorajszej
+  produkcji PV, baterii, importu/eksportu i kosztów.
+
+triggers:
+  - trigger: time
+    at: "07:00:00"
+
+conditions: []
+
+actions:
+  - variables:
+      produkcja: "{{ states('input_number.wczoraj_produkcja_pv') | float(0) | round(1) }}"
+      zuzycie: "{{ states('input_number.wczoraj_zuzycie_domu') | float(0) | round(1) }}"
+      pv_dom: "{{ states('input_number.wczoraj_pv_dom') | float(0) | round(1) }}"
+      pv_bat: "{{ states('input_number.wczoraj_pv_bateria') | float(0) | round(1) }}"
+      eksport: "{{ states('input_number.wczoraj_eksport_do_sieci') | float(0) | round(1) }}"
+      import_kwh: "{{ states('input_number.wczoraj_import_z_sieci') | float(0) | round(1) }}"
+      koszt_import: "{{ states('input_number.wczoraj_koszt_importu') | float(0) | round(2) }}"
+      oszczednosc: "{{ states('input_number.wczoraj_oszczednosc') | float(0) | round(2) }}"
+      koszt_bez_pv: "{{ states('input_number.wczoraj_koszt_bez_pv_i_mag') | float(0) | round(2) }}"
+      samow: "{{ states('input_number.wczoraj_samowystarczalnosc') | float(0) | round(0) }}"
+      naladowano: "{{ states('input_number.wczoraj_naladowano') | float(0) | round(1) }}"
+      rozladowano: "{{ states('input_number.wczoraj_rozladowano') | float(0) | round(1) }}"
+      bat_soc: "{{ states('sensor.inverter_battery') | float(0) | round(0) }}"
+      cop_wczoraj: "{{ states('sensor.pompa_wczoraj_cop') | float(0) | round(1) }}"
+      pompa_kwh: "{{ states('sensor.pompa_wczoraj_energia') | float(0) | round(1) }}"
+      prognoza_dzis: "{{ states('sensor.energy_production_today') | float(0) | round(1) }}"
+
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        *☀️ Raport PV — wczoraj*
+
+        💰 Oszczędność: {{ oszczednosc }} PLN
+        (bez PV: {{ koszt_bez_pv }} PLN)
+
+        ⚡ Produkcja: {{ produkcja }} kWh
+        🏠 Zużycie: {{ zuzycie }} kWh
+
+        🌞 PV→dom: {{ pv_dom }} | PV→bat: {{ pv_bat }} kWh
+        🔋 Bat: +{{ naladowano }}/-{{ rozladowano }} kWh ({{ bat_soc }}%)
+
+        🌐 Import: {{ import_kwh }} kWh ({{ koszt_import }} PLN)
+        📤 Eksport: {{ eksport }} kWh
+
+        🌡️ Pompa: {{ pompa_kwh }} kWh, COP {{ cop_wczoraj }}
+        ✅ Samowystarczalność: {{ samow }}%
+
+        🔮 Prognoza dziś: {{ prognoza_dzis }} kWh
+
+mode: single
