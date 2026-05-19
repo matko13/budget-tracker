@@ -1,0 +1,132 @@
+# PV - alerty WhatsApp
+# ================================
+#
+# Zestaw alertów dotyczących instalacji PV:
+# 1. Bateria pełna (>95%) - czas włączyć duże odbiorniki
+# 2. Bateria niska (<15%) i brak słońca - przygotuj się na import
+# 3. Nadprodukcja - duży eksport, warto zużyć
+# 4. Falownik offline - problem z instalacją
+#
+# WYMAGANE ENCJE:
+#   - sensor.inverter_battery (SOC %)
+#   - sensor.pv_power (aktualna moc PV w W)
+#   - sensor.grid_export_power (eksport W)
+#   - sensor.inverter_status lub binary_sensor.inverter_online
+#   - script.whatsapp_notify
+
+id: "pv_whatsapp_battery_full"
+alias: "PV Alert - bateria pełna (WhatsApp)"
+description: "Powiadom gdy bateria >95% - czas zużyć energię"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.inverter_battery
+    above: 95
+    for:
+      minutes: 5
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ now().hour >= 8 and now().hour <= 20 }}
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🔋 *Bateria pełna!* ({{ states('sensor.inverter_battery') }}%)
+
+        Czas włączyć duże odbiorniki:
+        • Zmywarka / pralka
+        • Ładowanie auta
+        • Podgrzanie CWU
+
+        Aktualna produkcja: {{ states('sensor.pv_power') }}W
+
+mode: single
+---
+id: "pv_whatsapp_battery_low"
+alias: "PV Alert - bateria niska (WhatsApp)"
+description: "Powiadom gdy bateria <15% - import z sieci"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.inverter_battery
+    below: 15
+    for:
+      minutes: 10
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ now().hour >= 7 and now().hour <= 22 }}
+  - condition: numeric_state
+    entity_id: sensor.pv_power
+    below: 200
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        ⚠️ *Bateria niska* ({{ states('sensor.inverter_battery') }}%)
+
+        Słaba produkcja PV ({{ states('sensor.pv_power') }}W).
+        Dom przechodzi na import z sieci.
+
+        💡 Ogranicz duże odbiorniki.
+
+mode: single
+---
+id: "pv_whatsapp_overproduction"
+alias: "PV Alert - nadprodukcja (WhatsApp)"
+description: "Powiadom o dużym eksporcie - można zużyć"
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.grid_export_power
+    above: 3000
+    for:
+      minutes: 15
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        ☀️ *Nadprodukcja PV!*
+
+        Eksport: {{ states('sensor.grid_export_power') }}W
+        Produkcja: {{ states('sensor.pv_power') }}W
+        Bateria: {{ states('sensor.inverter_battery') }}%
+
+        Warto włączyć odbiorniki (pralka, CWU, auto).
+
+mode: single
+---
+id: "pv_whatsapp_inverter_offline"
+alias: "PV Alert - falownik offline (WhatsApp)"
+description: "Powiadom gdy falownik jest niedostępny"
+
+triggers:
+  - trigger: state
+    entity_id: sensor.inverter_battery
+    to: "unavailable"
+    for:
+      minutes: 30
+
+conditions: []
+
+actions:
+  - action: script.whatsapp_notify
+    data:
+      message: >
+        🚨 *Falownik OFFLINE!*
+
+        Brak komunikacji z falownikiem od 30 min.
+        Sprawdź:
+        • Zasilanie falownika
+        • Połączenie WiFi/LAN
+        • Status w aplikacji producenta
+
+mode: single
